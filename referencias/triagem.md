@@ -43,6 +43,8 @@ Leia o pedido, o relatório do batedor, o plano e, na etapa 8, o diff. **Anote n
 | [contrato](../papeis/lentes/contrato.md) | mudança de API ou de formato que outro cliente consome (app já instalado, integração, outro serviço, exportação), campo removido ou renomeado, versão |
 | lentes do projeto | superfícies S do perfil. Se o projeto tem agente para ela e o arquivo do agente ainda existe, use o agente do projeto; se sumiu, use a lente da seiva mais próxima e anote. |
 
+**Invasor:** varredura de segurança do sistema inteiro, a pedido do usuário ou em tarefa de segurança N3 ([papel](../papeis/invasor.md)). O relatório dele passa por um revisor de segurança antes de virar conserto.
+
 **Adversário:** revisa o plano em N2 e N3 e o diff em N3. Em qualquer nível, se nenhuma lente acionar no diff, o adversário faz a revisão do diff.
 
 **Teto:** até 4 revisores por portão. Se acionarem mais, junte lentes afins no mesmo agente (desempenho com operação, contrato com dados) ou parta a tarefa.

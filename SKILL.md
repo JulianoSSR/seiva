@@ -107,6 +107,8 @@ Verificador ([papel](papeis/verificador.md)): outro agente que não o implementa
 
 Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`. O script inclui arquivo novo e deixa de fora o que outra sessão mexeu. Recalcule as lentes pelo diff real, porque ele pode tocar mais do que o plano previa; se nenhuma lente acionar, o adversário revisa o diff. Em N3, o adversário revisa sempre. O julgamento segue a etapa 5; correções voltam ao implementador, até 3 rodadas.
 
+**Varredura de segurança (invasor).** Quando o usuário pedir uma varredura do sistema, e não de uma mudança só, ou quando a tarefa for de segurança em N3, o **invasor** ([papel](papeis/invasor.md)) ataca o código como quem quer invadir, vazar dado e derrubar o sistema, e devolve um relatório de conserto. Ataca o código, nunca o sistema no ar. O relatório passa por um revisor de segurança de contexto limpo, que confirma, refuta ou marca como incerto cada brecha. Só o confirmado vira conserto, pelo caminho normal: etapa 5 para julgar, 6 para construir, 7 e 8 para provar. Brecha que mexe em permissão, isolamento entre clientes, migration ou segredo passa pelo usuário antes do código, salvo quando ele já autorizou o fluxo de conserto. Categoria `forte` para o invasor e `padrao` para o revisor.
+
 ### 9 · Entregar e aprender
 
 - Atualize o status nos registros que o perfil manda (seção R), no mesmo trabalho. Número de item novo (bug, incidente, decisão) segue a regra de numeração da seção R; sem regra, confira o maior número em uso no arquivo como está agora, nunca pelo histórico do git, porque outra sessão pode ter acabado de usar o próximo.
@@ -158,6 +160,6 @@ Escalada, modelo indisponível, independência e outros harnesses: [modelos](ref
 | `referencias/revisao.md` | julgar achados, critério de parada |
 | `referencias/harness.md` | disparar subagentes neste harness |
 | `referencias/evolucao.md` | fechar a tarefa, registrar escape |
-| `papeis/*.md`, `papeis/lentes/*.md` | colar no pacote do subagente |
+| `papeis/*.md`, `papeis/lentes/*.md` | colar no pacote do subagente (o `papeis/invasor.md` na varredura de segurança) |
 | `moldes/*.md` | perfil, plano e registro |
 | `scripts/*.sh` | impressão das fontes, pasta da tarefa, diff da tarefa, checagem da skill |
