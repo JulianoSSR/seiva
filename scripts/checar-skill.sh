@@ -22,8 +22,9 @@ linhas=$(wc -l < SKILL.md)
 [ "$linhas" -lt 500 ] || falha "SKILL.md com $linhas linhas (máximo recomendado 500)"
 
 # Links relativos em markdown apontam para arquivo ou pasta que existe.
+# A pasta de trabalho da seiva (.seiva/) e a configuração local (.claude/) ficam de fora: não fazem parte da skill.
 quebrados=$(
-  find . -name '*.md' -not -path './.git/*' | while read -r md; do
+  find . -name '*.md' -not -path './.git/*' -not -path './.seiva/*' -not -path './.claude/*' | while read -r md; do
     dir=$(dirname "$md")
     grep -o '\]([^)#]*)' "$md" | sed 's/^](//; s/)$//' | while read -r alvo; do
       case "$alvo" in http*|mailto:*|'') continue ;; esac
@@ -36,8 +37,11 @@ if [ -n "$quebrados" ]; then
   falhas=$((falhas + $(printf '%s\n' "$quebrados" | wc -l)))
 fi
 
-# Scripts com sintaxe válida.
-for s in scripts/*.sh; do bash -n "$s" || falha "sintaxe em $s"; done
+# Scripts e testes de scripts com sintaxe válida (o padrão sem arquivo é pulado).
+for s in scripts/*.sh testes/scripts/*.sh; do
+  [ -e "$s" ] || continue
+  bash -n "$s" || falha "sintaxe em $s"
+done
 
 if [ "$falhas" -eq 0 ]; then
   echo "OK: description $tam caracteres, SKILL.md $linhas linhas, links e scripts em ordem"
