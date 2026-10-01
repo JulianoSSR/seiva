@@ -34,4 +34,4 @@
 <!-- Preencher na etapa 9. É por esta lista que uma tarefa futura descobre um escape. -->
 
 ## Retomada
-<!-- Atualizar a cada etapa: onde parou, próximo passo, o que espera do usuário. -->
+<!-- Atualizar a cada etapa: onde parou, próximo passo, o que espera do usuário. Antes de leva com orçamento restrito e na parada limpa: o que rodava, o próximo passo e retomar em sessão nova. -->

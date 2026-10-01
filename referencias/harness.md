@@ -21,6 +21,72 @@ Regras para todos:
 - **O que o subagente não tem:** a conversa, a memória da sessão, o `CLAUDE.md` de outro repositório. Tudo vai no pacote.
 - **Tokens:** a notificação de fim de cada subagente traz os tokens usados. Anote no registro.
 
+## Orçamento vivo (só no Claude Code)
+
+No Claude Code, a statusline recebe a cada mensagem o uso das janelas de 5 horas e de 7 dias e o tamanho do contexto da sessão. O `scripts/statusline-orcamento.sh` guarda esses números, e o `scripts/orcamento.sh` os lê antes de cada leva de agentes. Sem a statusline nada disto existe, e a seiva trabalha como sempre.
+
+- **O que é gravado, e onde:** em `${XDG_CACHE_HOME:-$HOME/.cache}/seiva/`, sempre em modo 600. O `orcamento.json` traz `versao`, `harness`, `script` (o caminho do script que gravou), `gravado_em`, `sessao`, `cinco_horas` e `sete_dias` (`usado`, `reinicia` e `visto_em`) e `contexto` (`usado` e `sessao`). O `retomar` guarda o caminho do `registro.md` da tarefa em curso: o `orcamento.sh --tarefa <pasta>` o grava, e a barra o usa para dizer qual tarefa retomar. A statusline é do usuário. A seiva fornece o script, e nenhum script dela escreve no `settings.json`.
+- **Instalação:** só com o usuário. O orquestrador pergunta antes, preenche `SKILL` com o caminho absoluto da skill que está carregada (o harness mostra a pasta base dela; nunca suponha `~/.claude/skills/seiva`, porque a skill pode vir de um clone ou de um plugin) e entrega o bloco abaixo. A instalação é por cópia: atualizar a skill não muda o script que roda a cada mensagem. O bloco para sem mudar nada se o `settings.json` já tem uma `statusLine`. Depois de rodar, o usuário abre uma sessão nova e manda uma mensagem.
+
+```bash
+(
+  umask 077 &&
+  SKILL='<caminho absoluto da skill carregada, preenchido pelo orquestrador>' &&
+  CFG="$HOME/.claude/settings.json" &&
+  test -f "$SKILL/scripts/statusline-orcamento.sh" &&
+  { test -f "$CFG" || printf '{}\n' > "$CFG"; } &&
+  jq -e 'type == "object" and (has("statusLine") | not)' "$CFG" >/dev/null &&
+  cp -p "$CFG" "$CFG.bak-$(date +%Y%m%d-%H%M%S)" &&
+  install -m 0755 "$SKILL/scripts/statusline-orcamento.sh" "$HOME/.claude/statusline-seiva.sh" &&
+  jq '.statusLine = {"type": "command", "command": "bash ~/.claude/statusline-seiva.sh", "padding": 0}' "$CFG" > "$CFG.novo" &&
+  jq -e '.statusLine.command == "bash ~/.claude/statusline-seiva.sh"' "$CFG.novo" >/dev/null &&
+  mv "$CFG.novo" "$CFG" &&
+  echo "OK às $(date +%s): abra uma sessão nova, mande uma mensagem e rode: bash $SKILL/scripts/orcamento.sh"
+) || echo "PAROU AQUI: o settings.json só muda na linha do mv. Se já existe statusLine, o bloco para de propósito."
+```
+
+- **Atualização:** depois de atualizar a skill, ou quando o `orcamento.sh` avisar `statusline desatualizada`, o usuário copia o script de novo:
+
+```bash
+install -m 0755 '<caminho absoluto da skill carregada>/scripts/statusline-orcamento.sh' ~/.claude/statusline-seiva.sh
+```
+
+- **Volta:** o bloco abaixo tira a `statusLine` do `settings.json`, e só depois apaga a cópia e os arquivos do cache. Se a `statusLine` não for a da seiva, ele para. O `.bak-<data>` que a instalação deixou é o último recurso: desfaz também o que mudou no `settings.json` depois dele.
+
+```bash
+(
+  umask 077 &&
+  CFG="$HOME/.claude/settings.json" &&
+  C="${XDG_CACHE_HOME:-$HOME/.cache}/seiva" &&
+  jq -e '.statusLine.command == "bash ~/.claude/statusline-seiva.sh"' "$CFG" >/dev/null &&
+  jq 'del(.statusLine)' "$CFG" > "$CFG.novo" &&
+  jq -e 'has("statusLine") | not' "$CFG.novo" >/dev/null &&
+  mv "$CFG.novo" "$CFG" &&
+  rm -f "$HOME/.claude/statusline-seiva.sh" "$C/orcamento.json" "$C/retomar" &&
+  { rmdir "$C" 2>/dev/null || true; } &&
+  echo "OK: statusline removida do settings e depois do disco; vale na próxima sessão"
+) || echo "PAROU AQUI: se a statusLine não é a da seiva, o bloco para de propósito. O .bak-<data> é o último recurso: ele desfaz também o que mudou no settings depois dele."
+```
+
+- **Limiares (janela de 5 horas):** antes de cada leva, o orquestrador roda `bash <skill>/scripts/orcamento.sh --tarefa <pasta-da-tarefa>` e lê a palavra depois de `ORCAMENTO`.
+  - `ok`: segue.
+  - `restrito` (70% ou mais, código 10): N2 e N3 não começam nem abrem leva nova. O usuário pode mandar seguir, e isso vira `D-n` no registro, com o custo se errado. N0 e N1 seguem, com a Retomada gravada antes de cada leva. O nível não desce por causa do orçamento: uma tarefa N3 continua N3 e espera o reinício ou a decisão do usuário.
+  - `parar` (85% ou mais, código 20): parada limpa em qualquer nível, só na fronteira entre levas. O agente em curso termina.
+  - `sem-dado`: a janela reiniciou depois da última gravação, e o percentual gravado é da janela anterior. Trate como `desligado` até a statusline gravar de novo.
+  - `desligado`: sem statusline, sem `jq` ou sem arquivo legível. Diga uma vez por tarefa que o orçamento vivo está desligado e siga como sempre.
+- **Parada limpa:** grave a Retomada no `registro.md` (o que rodava, o próximo passo e "retomar em sessão nova") e diga ao usuário a hora do reinício, que a linha do `orcamento.sh` traz, e o caminho absoluto do `registro.md`: `abra uma sessão nova depois das HH:MM e diga: retome <caminho>`. Nunca sugira "Tentar novamente" na sessão gigante: retomar sessão grande recria o cache inteiro, e as maiores quebras medidas foram de 800 a 940 mil tokens (session-report, 30 dias, uma máquina, em 2026-09-29). Na sessão nova, o orquestrador lê a Retomada do registro e segue do passo gravado.
+- **Estouro no meio da leva:** a janela pode acabar com um agente rodando. O que salva o trabalho é a Retomada gravada antes da leva. A barra ajuda: a partir de 70% ela termina com `estourou? sessão nova + retome <tarefa>`, com o nome da pasta que o `--tarefa` gravou.
+- **Como ler o dado:** o percentual gravado vale como piso até a janela reiniciar, porque o uso só cresce dentro dela. Depois da hora do reinício, o estado é `sem-dado`. A idade aparece na linha (`dado de <n> min`) e conta desde a última vez que a barra recebeu dado da janela. O leitor avisa `statusline desatualizada` quando a cópia instalada difere da do repositório, e `versão da statusline não conferida` quando não consegue comparar.
+- **Limites:**
+  - só chega `rate_limits` para assinante Pro ou Max, e só depois da 1ª resposta da sessão (documentação oficial da statusline do Claude Code, lida em 2026-09-29);
+  - o contexto é o da última sessão que gravou, não o de todas;
+  - na aba Code do app desktop não foi confirmado que a statusline rode; sem o arquivo, o leitor diz `desligado`, e com um arquivo gravado antes por uma sessão do terminal ele usa esse dado como piso, com a idade na linha;
+  - a decisão olha só a janela de 5 horas: a de 7 dias aparece na linha, mas não trava nada, e perto do teto semanal quem decide é o usuário (`/usage`);
+  - o `retomar` vale por 6 horas depois da última leva; mais velho, a barra volta ao texto genérico;
+  - em outro harness o leitor diz `desligado`: a statusline é do Claude Code;
+  - duas sessões gravando ao mesmo tempo podem perder uma atualização, que a mensagem seguinte corrige;
+  - a barra pode estar uma mensagem atrás (a atualização espera 300 ms e é cancelada se outra chega), então a idade do dado fica visível.
+
 ## Codex CLI
 
 Confira na documentação do Codex antes do primeiro uso, porque os detalhes mudam rápido.
