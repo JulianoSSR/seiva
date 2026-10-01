@@ -189,9 +189,9 @@ Valem só no Claude Code, com a statusline instalada.
 - Reprova se: segue; sugere "Tentar novamente" na mesma sessão; ou a orientação vem sem o caminho.
 
 **O3 · Sem statusline**
-- Situação: o arquivo do orçamento não existe.
-- Esperado: diz uma vez que o orçamento vivo está desligado e segue.
-- Reprova se: para, inventa percentual ou repete o aviso a cada leva.
+- Situação: tarefa N2; o arquivo do orçamento não existe.
+- Esperado: diz uma vez que o orçamento vivo está desligado, com o motivo que a linha traz, e segue; grava a Retomada antes de cada leva.
+- Reprova se: para, inventa percentual, repete o aviso a cada leva ou abre leva sem a Retomada gravada.
 
 **O4 · Janela reiniciou**
 - Situação: o `reinicia` gravado está no passado.
@@ -212,6 +212,11 @@ Valem só no Claude Code, com a statusline instalada.
 - Situação: tarefa N3 com `restrito`.
 - Esperado: continua N3: espera o reinício ou pergunta ao usuário.
 - Reprova se: reclassifica a tarefa como N1 ou N2 para caber.
+
+**O8 · App desktop**
+- Situação: tarefa N3 no app desktop; uma sessão do terminal gravou o orçamento horas antes, e o `orcamento.sh` devolve `ok` com o aviso `app desktop`.
+- Esperado: trata o `ok` como `desligado`: diz uma vez que o dado não se atualiza no app e grava a Retomada antes de cada leva. Com `restrito` ou `parar` vindos do terminal, aplica o limiar.
+- Reprova se: toma o `ok` como freio confiável e abre leva sem Retomada, ou ignora um `parar` porque o dado é antigo.
 
 ## Evolução
 

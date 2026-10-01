@@ -22,6 +22,10 @@
 # O percentual gravado vale como piso até a janela reiniciar (o uso só cresce dentro dela). A idade vem de
 # cinco_horas.visto_em: a barra pode estar uma mensagem atrás. Avisos: "statusline desatualizada" quando a cópia
 # instalada difere da do repositório; "versão da statusline não conferida" quando o script gravado no arquivo não é legível.
+#
+# O app desktop não chama a statusline (medido em 2026-10-01). Ele define CLAUDE_CODE_ENTRYPOINT=claude-desktop nos
+# comandos do agente, e o leitor usa isso só para dar o motivo certo: sem arquivo, diz que é o app; com arquivo, avisa
+# que o dado é da última sessão do terminal. A variável não é documentada; se mudar, volta o motivo genérico.
 set -uo pipefail
 export LC_ALL=C
 
@@ -53,13 +57,20 @@ fi
 case $arquivo in */*) dir=${arquivo%/*} ;; *) dir=. ;; esac
 case $0 in */*) aqui=${0%/*} ;; *) aqui=. ;; esac
 
+desktop=0
+[ "${CLAUDE_CODE_ENTRYPOINT:-}" = claude-desktop ] && desktop=1
+
 estado=desligado
 detalhe=""
 script=""
 if ! command -v jq >/dev/null 2>&1; then
   detalhe="jq não está instalado"
 elif [ -z "$arquivo" ] || [ ! -r "$arquivo" ]; then
-  detalhe="sem arquivo de orçamento (a statusline não está instalada ou ainda não recebeu resposta)"
+  if [ "$desktop" = 1 ]; then
+    detalhe="sem arquivo de orçamento: o app desktop não chama a statusline, e o orçamento vivo só funciona com o claude no terminal"
+  else
+    detalhe="sem arquivo de orçamento (a statusline não está instalada, ainda não recebeu resposta ou o harness não a chama, como o app desktop)"
+  fi
 elif lido=$(jq -r '
   def num: if type == "number" then . else null end;
   def janela: if type == "object" then {usado: (.usado | num), reinicia: (.reinicia | num), visto_em: (.visto_em | num)} else {usado: null, reinicia: null, visto_em: null} end;
@@ -101,6 +112,7 @@ if [ "$estado" != desligado ]; then
   else
     avisos+=" · versão da statusline não conferida"
   fi
+  [ "$desktop" = 1 ] && avisos+=" · app desktop: o dado é da última sessão do terminal e não se atualiza aqui; restrito e parar valem, ok vale como desligado"
 fi
 
 # --tarefa: o ponto de retomada que a barra cita quando a janela estoura.

@@ -20,7 +20,7 @@ O nome vem da analogia: a seiva sobe pela árvore e toma a forma dela. A skill n
 - Não substitui as regras do projeto. Quando as duas divergem, vale a do projeto.
 - Não commita nem sobe nada se o projeto não permitir.
 - Não diz que a revisão foi independente quando não foi.
-- A statusline do orçamento vivo é opcional, e quem instala é você. A seiva só fornece o script e o bloco de instalação.
+- A statusline do orçamento vivo é opcional, e quem instala é você. A seiva só fornece o script e o bloco de instalação. Ela só roda no `claude` de terminal: o app desktop não a chama. No app, o orçamento vivo fica desligado. A exceção é o dado que uma sessão do terminal gravou antes: ele vale como piso, mas não se atualiza.
 
 ## Instalação
 

@@ -11,7 +11,7 @@ description: |
 license: MIT
 compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo e enxugar usam jq, sed GNU e timeout.
 metadata:
-  version: "1.1.0"
+  version: "1.1.1"
 ---
 
 # Seiva
@@ -122,7 +122,7 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Cada subagente recebe o pacote de ida e nada mais. Pacote para modelo pequeno leva passos numerados.
 - Saída longa de comando passa por `scripts/enxugar.sh`; relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
 - Quando o harness informa os tokens gastos por subagente, anote no registro. Orçamento da triagem estourado: avise antes de continuar.
-- No Claude Code, rode `scripts/orcamento.sh --tarefa <pasta>` antes de cada leva ([harness](referencias/harness.md)). Com 70% da janela de 5 horas, só N0 e N1 seguem, com a Retomada gravada antes, e o nível não desce por isso; com 85%, parada limpa, com o caminho do `registro.md` para a sessão nova. Sem a statusline, diga uma vez que o orçamento vivo está desligado.
+- No Claude Code, rode `scripts/orcamento.sh --tarefa <pasta>` antes de cada leva ([harness](referencias/harness.md)). Com 70% da janela de 5 horas, só N0 e N1 seguem, com a Retomada gravada antes, e o nível não desce por isso; com 85%, parada limpa, com o caminho do `registro.md` para a sessão nova. Com `desligado`, `sem-dado` ou `ok` com o aviso de app desktop, diga uma vez que o orçamento vivo está sem dado confiável, com o motivo que a linha traz, e grave a Retomada antes de cada leva de N2 ou N3: nada avisa que a janela está acabando.
 - Contexto compactado, sessão retomada ou sessão nova depois de parada limpa: releia `registro.md` (seção Retomada) e siga.
 
 ## Quando parar e perguntar

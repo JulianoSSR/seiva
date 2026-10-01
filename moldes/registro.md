@@ -34,4 +34,4 @@
 <!-- Preencher na etapa 9. É por esta lista que uma tarefa futura descobre um escape. -->
 
 ## Retomada
-<!-- Atualizar a cada etapa: onde parou, próximo passo, o que espera do usuário. Antes de leva com orçamento restrito e na parada limpa: o que rodava, o próximo passo e retomar em sessão nova. -->
+<!-- Atualizar a cada etapa: onde parou, próximo passo, o que espera do usuário. Antes de leva com orçamento restrito, antes de leva de N2 ou N3 sem dado de orçamento (desligado, sem-dado ou ok com o aviso de app desktop) e na parada limpa: o que rodava, o próximo passo e retomar em sessão nova. -->

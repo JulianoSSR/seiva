@@ -20,6 +20,8 @@ copia_antes=$([ -e "$claude_real/statusline-seiva.sh" ] && echo presente || echo
 T=$(mktemp -d) || exit 2
 trap 'rm -rf "$T"' EXIT
 export HOME="$T/home" XDG_CACHE_HOME="$T/cache" TZ=UTC
+# Rodando dentro do app desktop, a variável chega herdada e muda a linha do leitor; os casos do app a definem à mão.
+unset CLAUDE_CODE_ENTRYPOINT
 mkdir -p "$HOME" "$T/vazio"
 CACHE="$XDG_CACHE_HOME/seiva"
 ARQ="$CACHE/orcamento.json"
@@ -275,6 +277,34 @@ grava_orc 72 "$R1" "$agora"
 SAI=$(PATH="$T/vazio" "$BASH" "$LEI" 2>"$T/err")
 RC=$?
 eq "sem jq: desligado, 0 e sem stderr" "desligado 0 " "$(estado) $RC $(cat "$T/err")"
+
+# app desktop: a statusline não roda lá (medido em 2026-10-01); o leitor só muda o motivo e o aviso, nunca o estado
+lei_app() { # lei_app <valor de CLAUDE_CODE_ENTRYPOINT>
+  SAI=$(CLAUDE_CODE_ENTRYPOINT=$1 bash "$LEI" 2>"$T/err")
+  RC=$?
+  ERR=$(cat "$T/err")
+}
+limpa
+lei
+tem "sem arquivo, fora do app: o motivo genérico cita o app desktop" "$SAI" "ou o harness não a chama, como o app desktop"
+lei_app claude-desktop
+eq "sem arquivo, no app desktop: desligado, 0 e sem stderr" "desligado 0 " "$(estado) $RC $ERR"
+tem "sem arquivo, no app desktop: diz que o app não chama a statusline" "$SAI" "o app desktop não chama a statusline, e o orçamento vivo só funciona com o claude no terminal"
+lei_app cli
+nao_tem "sem arquivo, outro entrypoint: sem o motivo do app" "$SAI" "o app desktop não chama"
+grava_orc 42 "$R1" "$agora"
+lei_app claude-desktop
+eq "dado do terminal, no app desktop: o estado continua o do percentual" "ok 0" "$(estado) $RC"
+tem "dado do terminal, no app desktop: avisa que o dado não se atualiza" "$SAI" "app desktop: o dado é da última sessão do terminal e não se atualiza aqui; restrito e parar valem, ok vale como desligado"
+grava_orc 88 "$R1" "$agora"
+lei_app claude-desktop
+eq "88 do terminal, no app desktop: o piso continua valendo (parar e 20)" "parar 20" "$(estado) $RC"
+lei_app cli
+nao_tem "dado do terminal, outro entrypoint: sem aviso do app" "$SAI" "app desktop"
+mkdir -p "$CACHE"
+printf '{x' > "$ARQ"
+lei_app claude-desktop
+nao_tem "JSON inválido, no app desktop: o motivo é o JSON, sem aviso do app" "$SAI" "app desktop"
 
 # janela reiniciada: o percentual velho não vale
 grava_orc 90 "$PASSADO" "$((PASSADO - 60))"
