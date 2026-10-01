@@ -12,6 +12,7 @@ O nome vem da analogia: a seiva sobe pela árvore e toma a forma dela. A skill n
 - **Julga os achados e para na hora certa.** O orquestrador confere cada achado, agrupa por causa e decide a rota: pergunta ao usuário, revisão do plano, ajuste ou registro. No máximo três rodadas por portão.
 - **Verifica com outro agente.** Quem implementa não é quem prova. O verificador roda os comandos do projeto e confere cada critério de aceite e cada risco do plano.
 - **Aprende com o que escapa.** Defeito encontrado depois da entrega vira proposta de pergunta nova numa lente. Nada muda sem aprovação.
+- **Vigia a janela de uso (Claude Code).** Com a statusline opcional, confere o uso da janela de 5 horas antes de cada leva de agentes: perto do limite, segura as tarefas grandes e para limpo, com o ponto de retomada gravado, em vez de estourar no meio.
 
 ## O que ela não faz
 
@@ -19,6 +20,7 @@ O nome vem da analogia: a seiva sobe pela árvore e toma a forma dela. A skill n
 - Não substitui as regras do projeto. Quando as duas divergem, vale a do projeto.
 - Não commita nem sobe nada se o projeto não permitir.
 - Não diz que a revisão foi independente quando não foi.
+- A statusline do orçamento vivo é opcional, e quem instala é você. A seiva só fornece o script e o bloco de instalação.
 
 ## Instalação
 

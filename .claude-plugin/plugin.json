@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "seiva",
   "description": "Enxame de subagentes que se molda às regras do projeto: mede o risco, escolhe o modelo por tarefa, ataca o plano antes do código e só entrega com prova.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "JulianoSSR",
     "url": "https://github.com/JulianoSSR"

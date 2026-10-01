@@ -19,6 +19,15 @@ Levantamento feito em 2026-09-26, só leitura: nada foi instalado nem executado 
 | [ruvnet/claude-flow](https://github.com/ruvnet/claude-flow) | MIT | 3.45.0 | Roteamento pelo modelo mais barato que passa numa barra de qualidade (ideia; os números do projeto não foram verificados de forma independente) |
 | [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) | ver o repositório | lido em 2026-09-26 | Confiança numérica com limiar; lista de exclusões contra falso positivo; achado com cenário de exploração |
 
+## Levantamento de 2026-09-29 (versão 1.1)
+
+| Projeto | Licença | Versão lida | O que inspirou |
+|---|---|---|---|
+| [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/session-report), plugin session-report | Apache 2.0 | sem versão no manifesto; marketplace lido em 2026-09-29 | As medições de uso que deram o caso real do orçamento vivo (quebras de cache ao retomar sessão gigante). A skill não depende dele e nada foi copiado |
+| [headroomlabs-ai/headroom](https://github.com/headroomlabs-ai/headroom) | Apache-2.0 | README do `main` lido em 2026-09-29; release mais recente naquele dia: v0.39.1 (2026-09-26) | A compressão reversível: o original fica guardado na máquina e o que volta ao modelo é o resumo, com o caminho para buscar o resto. Nada foi copiado, e a seiva não depende dele (é proxy de rede em Python; o enxugar é um script local) |
+
+O RTK e o Context Mode foram estudados no mesmo levantamento, mas não inspiraram a 1.1.0 e ficam de fora. As fontes do podador, do observador e da revisão externa entram com a entrega delas.
+
 ## Estudos e textos
 
 - Anthropic, *How we built our multi-agent research system*, 2025-06-13: multiagente gasta cerca de 15 vezes os tokens de um chat; tarefas acopladas, como boa parte das de código, paralelizam mal.
@@ -30,6 +39,7 @@ Levantamento feito em 2026-09-26, só leitura: nada foi instalado nem executado 
 - Gary Klein, *Performing a Project Premortem*, Harvard Business Review, 2007-09.
 - STRIDE (Microsoft), OWASP API Security Top 10 2023 e OWASP ASVS 5.0: usados só pelos títulos das categorias, como perguntas.
 - Especificação Agent Skills (agentskills.io) e documentação oficial de subagentes do Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode, lidas em 2026-09.
+- Documentação oficial da statusline do Claude Code (campos `rate_limits` e `context_window`, atualização com debounce), lida em 2026-09-29.
 
 ## O que ficou de fora, e por quê
 

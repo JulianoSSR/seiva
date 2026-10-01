@@ -9,9 +9,9 @@ description: |
   deploy, integração externa), em bug que já voltou, ou quando pedirem "seiva", "enxame",
   "planeja e revisa" ou "sem retrabalho". Em tarefa trivial, manda fazer direto.
 license: MIT
-compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash.
+compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo e enxugar usam jq, sed GNU e timeout.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Seiva
@@ -50,7 +50,7 @@ Este arquivo é para o **orquestrador**, a sessão principal. Ele classifica, de
 | 8 Atacar o código | lentes (+ adversário) | achados | — | 1 revisor | ✓ | lentes + adversário |
 | 9 Entregar e aprender | orquestrador | entrega + aprendizado | ✓ | ✓ | ✓ | ✓ |
 
-Os níveis estão em [triagem](referencias/triagem.md). Na dúvida, o maior.
+Os níveis estão em [triagem](referencias/triagem.md). Na dúvida, o maior. O nível sobe sozinho quando uma etapa encontra superfície sensível; descer exige dizer ao usuário por quê.
 
 ### 0 · Terreno
 
@@ -64,8 +64,6 @@ Os níveis estão em [triagem](referencias/triagem.md). Na dúvida, o maior.
 2. Classifique nível, superfícies, lentes (com o sinal que acionou cada uma), categoria de cada papel e orçamento de agentes ([triagem](referencias/triagem.md)). Se o projeto já registrou o item com gravidade, parta dela; divergir exige uma linha de motivo.
 3. **Escape:** se a tarefa corrige defeito, procure os arquivos envolvidos na seção "Arquivos entregues" das tarefas anteriores (`tarefas/*/registro.md`). Achou: registre o escape antes de começar ([evolução](referencias/evolucao.md)).
 4. Diga ao usuário, em até 5 linhas: nível e motivo, lentes, orçamento e em que pontos vai parar para ouvi-lo. Se o perfil exige pergunta antes de acionar skill ou operação cara, faça aqui, numa pergunta só. Skill que aparecer como necessária mais adiante é perguntada na hora, pelo protocolo do projeto.
-
-O nível sobe sozinho quando uma etapa encontra superfície sensível. Descer exige dizer ao usuário por quê.
 
 ### 2 · Reconhecer
 
@@ -122,9 +120,10 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Confere prova por amostra: abre o `arquivo:linha` citado ou roda de novo o comando mais barato.
 - Não delega o que um comando resolve.
 - Cada subagente recebe o pacote de ida e nada mais. Pacote para modelo pequeno leva passos numerados.
-- Relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
+- Saída longa de comando passa por `scripts/enxugar.sh`; relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
 - Quando o harness informa os tokens gastos por subagente, anote no registro. Orçamento da triagem estourado: avise antes de continuar.
-- Contexto compactado ou sessão retomada: releia `registro.md` (seção Retomada) e siga.
+- No Claude Code, rode `scripts/orcamento.sh --tarefa <pasta>` antes de cada leva ([harness](referencias/harness.md)). Com 70% da janela de 5 horas, só N0 e N1 seguem, com a Retomada gravada antes, e o nível não desce por isso; com 85%, parada limpa, com o caminho do `registro.md` para a sessão nova. Sem a statusline, diga uma vez que o orçamento vivo está desligado.
+- Contexto compactado, sessão retomada ou sessão nova depois de parada limpa: releia `registro.md` (seção Retomada) e siga.
 
 ## Quando parar e perguntar
 
@@ -162,4 +161,4 @@ Escalada, modelo indisponível, independência e outros harnesses: [modelos](ref
 | `referencias/evolucao.md` | fechar a tarefa, registrar escape |
 | `papeis/*.md`, `papeis/lentes/*.md` | colar no pacote do subagente (o `papeis/invasor.md` na varredura de segurança) |
 | `moldes/*.md` | perfil, plano e registro |
-| `scripts/*.sh` | impressão das fontes, pasta da tarefa, diff da tarefa, checagem da skill |
+| `scripts/*.sh` | impressão das fontes, pasta da tarefa, diff da tarefa, checagem da skill, orçamento vivo, saída enxuta |
