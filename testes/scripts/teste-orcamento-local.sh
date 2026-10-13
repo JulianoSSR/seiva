@@ -127,16 +127,21 @@ roda --sessao "$SID" --calibrar 50
 eq "dedup + peso 0,01: 100+50+1000+0,01×10000" 1250 "$(campo .estimativa.tokens)"
 eq "calibração 50%: limite é o dobro" 2500 "$(campo .estimativa.limite)"
 tem "calibração 50%: ok com 50%" "$SAI" "ORCAMENTO ok — 5h 50%"
-tem "nota diz manual" "$SAI" "manual de"
+tem "nota diz que é uma leitura do /usage" "$SAI" "menor de 1 ponto: 0 limites batidos e 1 leitura do /usage"
 roda --sessao "$SID"
-tem "calibração manual vale na rodada seguinte" "$SAI" "5h 50%"
+tem "a leitura vale na rodada seguinte" "$SAI" "5h 50%"
 PESO_CACHE_LEITURA=0.1 roda --sessao "$SID"
 eq "PESO_CACHE_LEITURA=0.1 muda o total" 2150 "$(campo .estimativa.tokens)"
-roda --sessao "$SID" --calibrar 75
+roda --sessao "$SID" --calibrar 75 --em $((AGORA - 20))
 eq "75%: restrito, código 10" 10 "$RC"
 tem "75%: restrito" "$SAI" "ORCAMENTO restrito"
-roda --sessao "$SID" --calibrar 90
+roda --sessao "$SID" --calibrar 90 --em $((AGORA - 10))
 eq "90%: parar, código 20" 20 "$RC"
+roda --sessao "$SID" --calibrar 30 --em $((AGORA - 5))
+tem "leitura mais baixa não sobe o limite: vale o menor" "$SAI" "5h 90%"
+roda --sessao "$SID" --calibrar 60 --em $((AGORA - 10))
+eq "leitura na mesma hora substitui a anterior" 4 "$(jq '.leituras | length' "$CAL")"
+tem "com a de 90% substituída, vale a de 75%" "$SAI" "5h 75%"
 nao_tem "nenhum texto de conversa no estado" "$(cat "$JS" "$CAL")" "conversa que não pode sair"
 
 # --- janelas encadeadas: o que é de uma janela velha não conta -----------------------
@@ -170,11 +175,29 @@ u "$M" hoje 600 0 0 50000 0
 roda --sessao "$SID"
 eq "auto: limite = total da janela do aviso" 100000 "$(campo .estimativa.limite)"
 tem "auto: 50% agora" "$SAI" "ORCAMENTO ok — 5h 50%"
-tem "auto: a nota diz auto" "$SAI" "auto, 1 limite batido"
+tem "auto: a nota diz o ponto" "$SAI" "menor de 1 ponto: 1 limite batido e 0 leituras"
 eq "auto: um ponto gravado" 1 "$(jq '.pontos | length' "$CAL")"
-# Manual mais nova que o último limite vale mais; o próximo limite batido volta a mandar.
+# Leitura que implica limite maior não sobe o freio; a que implica limite menor desce.
 roda --sessao "$SID" --calibrar 25
-tem "manual mais nova que o limite manda" "$SAI" "5h 25%"
+tem "leitura acima do ponto: vale o menor (o do limite batido)" "$SAI" "5h 50%"
+roda --sessao "$SID" --calibrar 80 --em $((AGORA - 5))
+tem "leitura abaixo do ponto: passa a valer" "$SAI" "ORCAMENTO restrito — 5h 80%"
+tem "a nota conta os dois tipos de ponto" "$SAI" "menor de 3 pontos: 1 limite batido e 2 leituras do /usage"
+
+# --- leitura com hora (--em): só conta o gasto até aquela hora ----------------------
+novo
+u "$M" a 900 0 0 1000 0
+u "$M" b 60 0 0 3000 0
+roda --sessao "$SID" --calibrar 50 --em "$(iso $((AGORA - 300)) | sed 's/Z$/.667Z/')"
+eq "--em: o limite usa só o gasto até a hora da leitura" 2000 "$(campo .estimativa.limite)"
+tem "--em: agora a janela tem o dobro" "$SAI" "5h 200%"
+roda --sessao "$SID" --calibrar 50 --em $((AGORA - 7200))
+eq "--em fora da janela aberta: uso errado" 2 "$RC"
+tem "--em fora da janela: diz por quê" "$ERR" "não cai na janela"
+roda --sessao "$SID" --em $((AGORA - 300))
+eq "--em sem --calibrar: uso errado" 2 "$RC"
+roda --sessao "$SID" --calibrar 50 --em ontem
+eq "--em em formato que não é hora: uso errado" 2 "$RC"
 
 # --- janela de aviso aberta por uso que não aparece nos transcripts não calibra -------
 novo

@@ -11,7 +11,7 @@ description: |
 license: MIT
 compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo, enxugar, fichas e pré-julgamento usam jq, sed GNU e timeout.
 metadata:
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 # Seiva
@@ -123,7 +123,7 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Saída longa de comando passa por `scripts/enxugar.sh`; relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
 - Anote no registro os tokens de cada subagente (o Claude Code informa na notificação de fim) e, no fechamento, o total da tarefa com o da sessão do orquestrador. Orçamento da triagem estourado: avise antes de continuar.
 - Antes de cada leva, rode `scripts/orcamento-local.sh --tarefa <pasta>`, que lê os transcripts do Claude Code e funciona no terminal e no app desktop ([harness](referencias/harness.md)). `restrito` (70% da janela de 5 horas, estimado): só N0 e N1 seguem, e o nível não desce por isso. `parar` (85%, limite batido, ou contexto desta sessão em 70%): parada limpa. `desligado` ou `sem-dado`: diga uma vez o motivo que a linha traz e siga, com a Próxima ação gravada antes de cada leva.
-- Ao fechar cada etapa, `scripts/progresso.sh <pasta> marcar <n> feita <artefatos>` e o `contexto-tarefa.md` reescrito; antes de cada leva, só a Próxima ação dele. Parada limpa, sessão nova e volta de pausa: [retomada](referencias/retomada.md).
+- Ao fechar cada etapa, `scripts/progresso.sh <pasta> marcar <n> feita <artefatos>` e o `contexto-tarefa.md` reescrito; antes de cada leva, só a Próxima ação dele. Ao esperar o usuário com contexto acima de 200 mil, avise que voltar depois de 1 hora recria o cache inteiro. Parada limpa, sessão nova e volta de pausa: [retomada](referencias/retomada.md).
 
 ## Quando parar e perguntar
 

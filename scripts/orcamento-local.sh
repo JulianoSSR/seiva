@@ -4,12 +4,14 @@
 # Grava o resultado no formato do orcamento.json, com o campo "fonte", e passa a decisão ao scripts/orcamento.sh, que
 # continua sendo o único que decide entre ok, restrito e parar. Não precisa de statusline, de hook nem de terminal.
 #
-# Uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct>|auto]
+# Uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct> [--em <hora>] | --calibrar auto]
 #   --tarefa          repassado ao orcamento.sh, que grava o "retomar" da barra
 #   --sessao          a sessão cujo contexto se mede. Padrão: $CLAUDE_CODE_SESSION_ID (o app desktop define; medido em
 #                     2026-10-13). Sem ela, o transcript mais recente da pasta do projeto, com o aviso "sessão deduzida"
-#   --calibrar <pct>  calibração manual: <pct> é o uso da janela de 5 horas que o /usage, ou a página de uso do
-#                     claude.ai, mostra agora (de 10 a 100). Vale até a conta bater no limite de novo
+#   --calibrar <pct>  leitura do /usage (ou da página de uso do claude.ai): <pct> é o uso da janela de 5 horas que
+#                     ele mostrou (de 10 a 100). Vira um ponto de calibração, como um limite batido
+#   --em <hora>       quando a leitura foi feita: epoch ou ISO em UTC (2026-10-13T14:04:42.667Z, como o relatório do
+#                     /usage traz). Sem ela, agora. Conta só o que a janela tinha gastado até aquela hora
 #   --calibrar auto   refaz a calibração automática varrendo os transcripts dos últimos 30 dias
 #
 # Variáveis: PESO_CACHE_LEITURA (padrão 0.01), SEIVA_JANELA_CONTEXTO (tokens; sem ela, 1 milhão para o modelo que já
@@ -22,9 +24,9 @@
 #     (o transcript repete a mesma resposta numa linha por bloco de conteúdo; a chave é message.id + requestId);
 #   - a janela começa na 1ª resposta depois do fim da anterior, arredondada para baixo em 10 minutos, e dura 5 horas.
 #     Quando a conta bateu no limite, a mensagem "You've hit your session limit · resets <hora> (<fuso>)" dá a janela exata;
-#   - o percentual divide os tokens da janela pelo limite calibrado. Automática: cada vez que a conta bateu no limite, o
-#     total da janela até ali vale 100%, e o limite é a mediana dos 20 mais recentes. A manual vale enquanto for mais
-#     nova que o último limite batido;
+#   - o percentual divide os tokens da janela pelo limite calibrado. Cada vez que a conta bateu no limite, o total da
+#     janela até ali vale 100%; cada leitura do /usage vale o percentual lido. O limite é o MENOR dos 5 pontos mais
+#     recentes: freio conservador. (Em 2026-10-13 a mediana dos 20 limites anteriores dava 40% quando o /usage dava 73%.)
 #   - o contexto é o tamanho da última resposta da sessão (entrada + leitura e escrita de cache) sobre a janela do modelo.
 #   O percentual é ESTIMADO: a contabilidade da assinatura não é pública. É freio, não medidor oficial.
 #
@@ -34,19 +36,21 @@ set -uo pipefail
 export LC_ALL=C
 umask 077
 
-uso() { echo "uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct>|auto]" >&2; exit 2; }
+uso() { echo "uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct> [--em <hora>] | --calibrar auto]" >&2; exit 2; }
 
 tarefa=""
 sessao=""
 calibrar=""
+em=""
 while [ "$#" -gt 0 ]; do
   case $1 in
-    --tarefa | --sessao | --calibrar)
+    --tarefa | --sessao | --calibrar | --em)
       [ "$#" -ge 2 ] && [ -n "$2" ] || uso
       case $1 in
         --tarefa) tarefa=$2 ;;
         --sessao) sessao=$2 ;;
         --calibrar) calibrar=$2 ;;
+        --em) em=$2 ;;
       esac
       shift 2
       ;;
@@ -61,6 +65,14 @@ case $calibrar in
       { echo "--calibrar: o percentual vai de 10 a 100 (abaixo de 10, o erro da conta fica grande demais)" >&2; exit 2; }
     ;;
 esac
+
+if [ -n "$em" ]; then
+  case $calibrar in '' | auto) echo "--em só vale com --calibrar <pct>" >&2; exit 2 ;; esac
+  case $em in
+    *[!0-9]*) em=$(jq -nr --arg t "$em" '$t | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601' 2>/dev/null) || em="" ;;
+  esac
+  [ -n "$em" ] || { echo "--em: use epoch ou ISO em UTC, como 2026-10-13T14:04:42Z" >&2; exit 2; }
+fi
 
 pcl=${PESO_CACHE_LEITURA:-0.01}
 awk -v p="$pcl" 'BEGIN { exit !(p ~ /^[0-9]*\.?[0-9]+$/ && p + 0 <= 1) }' ||
@@ -83,6 +95,7 @@ cal=$dir/calibracao.json
 stl=$dir/orcamento.json
 trans=${SEIVA_TRANSCRIPTS:-${HOME:-/nonexistent}/.claude/projects}
 agora=$(date +%s)
+[ -n "$em" ] || em=$agora
 avisos=""
 
 # Sessão: a do harness; sem ela, a do transcript mais recente na pasta do projeto (o nome da pasta é o caminho com
@@ -162,7 +175,7 @@ fi
 
 saida=$(env ${tz:+TZ="$tz"} jq -s -r \
   --argjson agora "$agora" --argjson pcl "$pcl" --argjson janela_env "$janela_env" --argjson inicio "$((agora - minutos * 60))" \
-  --arg sid "$sessao" --argjson cal "$calj" --argjson stl "$stlj" --arg calibrar "$calibrar" --arg script "$0" '
+  --arg sid "$sessao" --argjson cal "$calj" --argjson stl "$stlj" --arg calibrar "$calibrar" --argjson em "$em" --arg script "$0" '
   def mediana: sort | .[(length - 1) / 2 | floor];
   def fmt: if . >= 1000000 then "\((. / 100000 | floor) / 10) mi" else "\(. / 1000 | floor) mil" end | gsub("\\."; ",");
   def pct: (. * 10 + 1e-9 | floor) / 10;
@@ -202,19 +215,25 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
       | select(($j | length) > 0 and (($j | map(.ts) | min) - ($h.r - 18000)) < 600)
       | {r: $h.r, hit: $h.hit, x: ($j | map(.x) | add), y: ($j | map(.y) | add)}]) as $novos
   | ((if $calibrar == "auto" then [] else ($cal.pontos // []) end) + $novos | unique_by(.r) | sort_by(.r) | .[-30:]) as $pontos
-  | ($pontos | .[-20:] | map(.x + $pcl * .y)) as $vals
+  # Leitura do /usage: o percentual lido em $em, contra o total da janela até $em.
   | (if $calibrar != "" and $calibrar != "auto" then
-       (if $aberta and $w > 0 then {em: $agora, pct: ($calibrar | tonumber), x: $bloco.x, y: $bloco.y} else "erro" end)
-     else ($cal.manual // null) end) as $man
-  | if $man == "erro" then "erro", "--calibrar: não há janela de 5 horas aberta nos transcripts agora; mande uma mensagem e rode de novo"
+       ([$us[] | select(.ts >= $bloco.ini and .ts <= $em)]) as $ate
+       | (if $aberta and $em >= $bloco.ini and $em <= $agora and ($ate | length) > 0
+          then {em: $em, pct: ($calibrar | tonumber), x: ($ate | map(.x) | add), y: ($ate | map(.y) | add)} else "erro" end)
+     else null end) as $nova
+  | if $nova == "erro" then "erro", "--calibrar: a hora da leitura não cai na janela de 5 horas aberta nos transcripts (ou não há janela aberta agora)"
     else
-  ((if $man != null and (($pontos | length) == 0 or $man.em > ($pontos | map(.hit) | max)) then
-      {limite: (($man.x + $pcl * $man.y) / ($man.pct / 100)), rotulo: "manual de \($man.em | strflocaltime("%d/%m")) com \($man.pct)%"}
-    elif ($vals | length) > 0 then
-      (($vals | add / length) as $m | if ($vals | length) >= 3 and $m > 0
-         then " ±\(($vals | map((. - $m) * (. - $m)) | add / length | sqrt) / $m * 100 | floor)%" else "" end) as $disp
-      | {limite: ($vals | mediana), rotulo: "auto, \($vals | length) limite\(if ($vals | length) > 1 then "s" else "" end) batido\(if ($vals | length) > 1 then "s" else "" end)\($disp)"}
-    else null end)) as $lim
+  ((($cal.leituras // []) + (if $nova != null then [$nova] else [] end)) | group_by(.em) | map(last) | sort_by(.em) | .[-10:]) as $leituras
+  # Cada ponto estima o limite (limite batido = 100%; leitura = o percentual lido). Vale o menor dos 5 mais recentes.
+  | (([$pontos[] | {t: .hit, l: (.x + $pcl * .y), k: "l"}] + [$leituras[] | {t: .em, l: ((.x + $pcl * .y) / (.pct / 100)), k: "u"}])
+     | map(select(.l > 0)) | sort_by(.t) | .[-5:]) as $rec
+  | (if ($rec | length) == 0 then null else
+      ($rec | map(.l)) as $v | ($v | add / length) as $m
+      | ($rec | map(select(.k == "l")) | length) as $nl | ($rec | map(select(.k == "u")) | length) as $nu
+      | {limite: ($v | min),
+         rotulo: ("menor de \($v | length) ponto\(if ($v | length) > 1 then "s" else "" end): \($nl) limite\(if $nl == 1 then "" else "s" end) batido\(if $nl == 1 then "" else "s" end) e \($nu) leitura\(if $nu == 1 then "" else "s" end) do /usage"
+                  + (if ($v | length) >= 3 and $m > 0 then ", dispersão \(($v | map((. - $m) * (. - $m)) | add / length | sqrt) / $m * 100 | floor)%" else "" end))}
+     end) as $lim
 
   # Contexto: o da última resposta do transcript desta sessão.
   | (($cal.contexto_max // {}) as $antes
@@ -230,7 +249,7 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
   | (if $stl != null then {fonte: "statusline", c5: $stl.cinco_horas, d7: $stl.sete_dias, script: ($stl.script // "")}
      elif $limitada != null then {fonte: "jsonl", c5: {usado: 100, reinicia: $limitada.r, visto_em: $agora}}
      elif $lim == null then {fonte: "jsonl", c5: {usado: null, reinicia: (if $aberta then $bloco.fim else null end), visto_em: $agora,
-       motivo: "sem calibração: a conta não bateu no limite de 5 horas nos transcripts dos últimos 30 dias e não há calibração manual. Rode orcamento-local.sh --calibrar <percentual que o /usage mostra>"}}
+       motivo: "sem calibração: a conta não bateu no limite de 5 horas nos transcripts dos últimos 30 dias e não há leitura do /usage. Rode orcamento-local.sh --calibrar <percentual que o /usage mostra>"}}
      elif $aberta then {fonte: "jsonl", c5: {usado: (100 * $w / $lim.limite), reinicia: $bloco.fim, visto_em: $agora}}
      else {fonte: "jsonl", c5: {usado: 0, reinicia: null, visto_em: $agora}} end) as $f
 
@@ -252,7 +271,7 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
     ] | join(" · ")) as $nota
 
   | ($obj | tojson),
-    ({versao: 1, varrido_ate: $agora, pontos: $pontos, manual: $man, contexto_max: $ctxmax} | tojson),
+    ({versao: 1, varrido_ate: $agora, pontos: $pontos, leituras: $leituras, contexto_max: $ctxmax} | tojson),
     $nota
     end
 ' "$tmp" 2>/dev/null)

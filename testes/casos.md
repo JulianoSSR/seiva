@@ -259,9 +259,9 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 - Reprova se: abre leva antes do reinício, ou não grava a Próxima ação.
 
 **O11 · Calibração manual**
-- Situação: o usuário diz que o `/usage` mostra 40%, e a linha estimava 55%.
-- Esperado: `orcamento-local.sh --calibrar 40`; a linha passa a dizer "manual de <data> com 40%", e vale até a conta bater no limite de novo.
-- Reprova se: edita o `calibracao.json` à mão, ou mantém a estimativa antiga sem dizer.
+- Situação: o usuário cola o relatório do `/usage`, gerado às 14:04:42Z, com 73%; a linha estimava 40%.
+- Esperado: `orcamento-local.sh --calibrar 73 --em 2026-10-13T14:04:42Z`; a leitura entra como ponto, e a linha passa a contar "1 leitura do /usage". Uma leitura que implica limite maior não afrouxa o freio enquanto um ponto menor estiver entre os 5 mais recentes.
+- Reprova se: calibra sem `--em` quando a sessão gastou depois do relatório, edita o `calibracao.json` à mão, ou mantém a estimativa antiga sem dizer.
 
 ## Retomada
 
@@ -279,6 +279,11 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 - Situação: sessão nova com "continue", e o `progresso.sh <pasta> pendentes` lista duas tarefas.
 - Esperado: uma pergunta: qual das duas.
 - Reprova se: escolhe sozinho, ou lê as duas.
+
+**R5 · Pausa longa numa sessão grande**
+- Situação: entrega pronta, contexto em 370 mil, e o orquestrador vai esperar o usuário decidir sobre o commit.
+- Esperado: o `contexto-tarefa.md` em dia e uma linha na entrega: se for voltar depois de mais de 1 hora, sessão nova com "retome <caminho>".
+- Reprova se: a entrega não avisa, e a volta depois da pausa reescreve o contexto inteiro no cache.
 
 **R4 · Artefato mudou depois de feito**
 - Situação: o `conferir` mostra `plano.md MUDOU depois de feita`.

@@ -1,5 +1,15 @@
 # Registro de mudanças
 
+## 1.2.1 (2026-10-13)
+
+- Calibração por pontos. Caso real: na primeira conferência com o `/usage`, a regra da 1.2.0 (mediana dos 20 limites batidos mais recentes) dava cerca de 40% quando o oficial marcava 73%, e nenhum peso testado explicou a diferença. Agora cada leitura do `/usage` também vale como ponto (`--calibrar <pct> --em <hora do relatório>`, contando só o gasto da janela até aquela hora), e o limite é o menor dos 5 pontos mais recentes.
+- Pausa longa também é parada: com contexto acima de 200 mil, a entrega avisa que voltar depois de 1 hora recria o cache inteiro. Caso real: na mesma sessão, a volta de uma pausa de 70 minutos gravou 373.540 tokens de cache numa resposta só.
+- Caso R5 novo e O11 reescrito; 11 casos novos em `teste-orcamento-local.sh`.
+
+Em aberto: com a leitura de 73% como base, aquela resposta levou a estimativa a mais de 100% sem a conta bater no limite: a escrita de cache pesa menos na conta oficial do que o peso 1 do script. Uma 2ª leitura do `/usage` mede quanto.
+
+Revisão: nenhuma revisão independente; feita pelo orquestrador, com os testes automáticos.
+
 ## 1.2.0 (2026-10-13)
 
 Objetivo: o mesmo processo (revisão independente, prova, segurança) com menos tokens, e funcionando no app desktop do Claude Code, onde a statusline não roda. Plano de origem: `plano-execucao-otimizacao-seiva.md`, do autor.

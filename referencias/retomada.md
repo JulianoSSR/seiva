@@ -30,6 +30,8 @@ Os gatilhos vêm do `orcamento-local.sh`, que roda antes de cada leva: `parar` p
    - parada por contexto: `abra uma sessão nova agora e diga: retome <pasta>/contexto-tarefa.md`;
    - parada pela janela de 5 horas: `abra uma sessão nova depois das HH:MM e diga: retome <pasta>/contexto-tarefa.md`, com a hora que a linha do orçamento traz.
 
+**Pausa longa também é parada.** O cache do contexto vive pouco: o transcript mostra o tempo de vida (`ephemeral_1h` ou `ephemeral_5m`). Voltar a uma sessão grande depois disso faz a 1ª resposta reescrever o contexto inteiro. Medido em 2026-10-13: uma sessão de 374 mil tokens, parada por 70 minutos com cache de 1 hora, gastou 373.540 tokens de escrita de cache numa resposta só. Por isso, ao entregar ou ao parar para esperar o usuário com o contexto acima de 200 mil, o orquestrador deixa o `contexto-tarefa.md` em dia e diz, em uma linha: "se for voltar depois de mais de 1 hora, abra uma sessão nova e diga: retome <caminho>".
+
 Nunca sugira "Tentar novamente" numa sessão grande. Depois da pausa, retomar a mesma sessão recria o cache do contexto inteiro: as maiores quebras medidas foram de 800 a 940 mil tokens (session-report, 30 dias, uma máquina, 2026-09-29). Parar com 70% de contexto também evita a compactação automática, que relê a conversa inteira para resumi-la e perde referências pelo caminho.
 
 ## Retomar
