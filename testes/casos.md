@@ -260,7 +260,7 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 
 **O11 · Calibração manual**
 - Situação: o usuário cola o relatório do `/usage`, gerado às 14:04:42Z, com 73%; a linha estimava 40%.
-- Esperado: `orcamento-local.sh --calibrar 73 --em 2026-10-13T14:04:42Z`; a leitura entra como ponto, e a linha passa a contar "1 leitura do /usage". Uma leitura que implica limite maior não afrouxa o freio enquanto um ponto menor estiver entre os 5 mais recentes.
+- Esperado: `orcamento-local.sh --calibrar 73 --em 2026-10-13T14:04:42Z`; a leitura entra como ponto, a linha passa a contar "1 leitura do /usage" e, dentro da janela aberta, vira âncora: o percentual parte dos 73%, e só o gasto depois das 14:04:42Z é estimado. Uma leitura que implica limite maior não afrouxa o freio enquanto um ponto menor estiver entre os 5 mais recentes.
 - Reprova se: calibra sem `--em` quando a sessão gastou depois do relatório, edita o `calibracao.json` à mão, ou mantém a estimativa antiga sem dizer.
 
 ## Retomada

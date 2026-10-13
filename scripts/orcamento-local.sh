@@ -27,6 +27,9 @@
 #   - o percentual divide os tokens da janela pelo limite calibrado. Cada vez que a conta bateu no limite, o total da
 #     janela até ali vale 100%; cada leitura do /usage vale o percentual lido. O limite é o MENOR dos 5 pontos mais
 #     recentes: freio conservador. (Em 2026-10-13 a mediana dos 20 limites anteriores dava 40% quando o /usage dava 73%.)
+#     Com leitura do /usage dentro da janela aberta, ela é a âncora: o percentual parte do valor lido, e só o gasto
+#     depois da leitura é estimado (duas leituras de 2026-10-13 não fecharam com peso nenhum: a janela tinha gasto
+#     que os transcripts não veem).
 #   - o contexto é o tamanho da última resposta da sessão (entrada + leitura e escrita de cache) sobre a janela do modelo.
 #   O percentual é ESTIMADO: a contabilidade da assinatura não é pública. É freio, não medidor oficial.
 #
@@ -245,11 +248,14 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
      elif $ult != null and (($ctxmax[$ult.m] // 0) > 200000) then 1000000 else 200000 end) as $jan
   | ($us | map(select(.s > 0)) | if length == 0 then null else map(.x + $pcl * .y) | add end) as $tsessao
   | ([$hits[] | select(.r > $agora)] | last) as $limitada
+  | ([$leituras[] | select(.em >= $bloco.ini and .em <= $agora)] | last) as $anc
+  | (if $anc == null then null else $w - ($anc.x + $pcl * $anc.y) end) as $depois
 
   | (if $stl != null then {fonte: "statusline", c5: $stl.cinco_horas, d7: $stl.sete_dias, script: ($stl.script // "")}
      elif $limitada != null then {fonte: "jsonl", c5: {usado: 100, reinicia: $limitada.r, visto_em: $agora}}
      elif $lim == null then {fonte: "jsonl", c5: {usado: null, reinicia: (if $aberta then $bloco.fim else null end), visto_em: $agora,
        motivo: "sem calibração: a conta não bateu no limite de 5 horas nos transcripts dos últimos 30 dias e não há leitura do /usage. Rode orcamento-local.sh --calibrar <percentual que o /usage mostra>"}}
+     elif $aberta and $anc != null then {fonte: "jsonl", c5: {usado: ($anc.pct + 100 * $depois / $lim.limite), reinicia: $bloco.fim, visto_em: $agora}}
      elif $aberta then {fonte: "jsonl", c5: {usado: (100 * $w / $lim.limite), reinicia: $bloco.fim, visto_em: $agora}}
      else {fonte: "jsonl", c5: {usado: 0, reinicia: null, visto_em: $agora}} end) as $f
 
@@ -264,6 +270,7 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
       (if $f.fonte == "statusline" then "fonte statusline (5h oficial) e transcripts (contexto)"
        elif $limitada != null then "fonte transcripts: a conta bateu no limite de 5 horas às \($limitada.hit | strflocaltime("%H:%M"))"
        elif $lim == null then "fonte transcripts: ≈ \($w | fmt) tokens ponderados na janela, sem calibração"
+       elif $aberta and $anc != null then "âncora: /usage das \($anc.em | strflocaltime("%H:%M")) com \($anc.pct)%, mais ≈ \($depois | fmt) tokens ponderados desde então sobre \($lim.limite | fmt) (\($lim.rotulo))"
        else "estimado pelos transcripts: ≈ \($w | fmt) de \($lim.limite | fmt) tokens ponderados (\($lim.rotulo))" end),
       (if $ctx == null then "contexto não medido: \(if $sid == "" then "sem id de sessão" else "sessão sem resposta nos transcripts" end)"
        else "contexto \($ctx | fmt) de \($jan | fmt)" end),

@@ -132,16 +132,18 @@ roda --sessao "$SID"
 tem "a leitura vale na rodada seguinte" "$SAI" "5h 50%"
 PESO_CACHE_LEITURA=0.1 roda --sessao "$SID"
 eq "PESO_CACHE_LEITURA=0.1 muda o total" 2150 "$(campo .estimativa.tokens)"
-roda --sessao "$SID" --calibrar 75 --em $((AGORA - 20))
+roda --sessao "$SID" --calibrar 75
 eq "75%: restrito, código 10" 10 "$RC"
 tem "75%: restrito" "$SAI" "ORCAMENTO restrito"
-roda --sessao "$SID" --calibrar 90 --em $((AGORA - 10))
+roda --sessao "$SID" --calibrar 90
 eq "90%: parar, código 20" 20 "$RC"
-roda --sessao "$SID" --calibrar 30 --em $((AGORA - 5))
-tem "leitura mais baixa não sobe o limite: vale o menor" "$SAI" "5h 90%"
-roda --sessao "$SID" --calibrar 60 --em $((AGORA - 10))
-eq "leitura na mesma hora substitui a anterior" 4 "$(jq '.leituras | length' "$CAL")"
-tem "com a de 90% substituída, vale a de 75%" "$SAI" "5h 75%"
+roda --sessao "$SID" --calibrar 30
+tem "a leitura mais nova é a âncora, mesmo mais baixa" "$SAI" "5h 30%"
+roda --sessao "$SID" --calibrar 45 --em $((AGORA - 30))
+n1=$(jq '.leituras | length' "$CAL")
+roda --sessao "$SID" --calibrar 46 --em $((AGORA - 30))
+eq "leitura na mesma hora substitui a anterior" "$n1" "$(jq '.leituras | length' "$CAL")"
+tem "leitura mais antiga não tira a âncora da mais nova" "$SAI" "5h 30%"
 nao_tem "nenhum texto de conversa no estado" "$(cat "$JS" "$CAL")" "conversa que não pode sair"
 
 # --- janelas encadeadas: o que é de uma janela velha não conta -----------------------
@@ -177,12 +179,13 @@ eq "auto: limite = total da janela do aviso" 100000 "$(campo .estimativa.limite)
 tem "auto: 50% agora" "$SAI" "ORCAMENTO ok — 5h 50%"
 tem "auto: a nota diz o ponto" "$SAI" "menor de 1 ponto: 1 limite batido e 0 leituras"
 eq "auto: um ponto gravado" 1 "$(jq '.pontos | length' "$CAL")"
-# Leitura que implica limite maior não sobe o freio; a que implica limite menor desce.
+# A leitura vira âncora; o gasto depois dela vai sobre o menor limite entre os pontos (o do limite batido).
 roda --sessao "$SID" --calibrar 25
-tem "leitura acima do ponto: vale o menor (o do limite batido)" "$SAI" "5h 50%"
-roda --sessao "$SID" --calibrar 80 --em $((AGORA - 5))
-tem "leitura abaixo do ponto: passa a valer" "$SAI" "ORCAMENTO restrito — 5h 80%"
-tem "a nota conta os dois tipos de ponto" "$SAI" "menor de 3 pontos: 1 limite batido e 2 leituras do /usage"
+tem "a leitura é a âncora" "$SAI" "5h 25%"
+tem "a nota conta os dois tipos de ponto" "$SAI" "menor de 2 pontos: 1 limite batido e 1 leitura do /usage"
+u "$M" depois 30 0 0 10000 0
+roda --sessao "$SID"
+tem "gasto depois da âncora vai sobre o menor limite: 25 + 10" "$SAI" "5h 35%"
 
 # --- leitura com hora (--em): só conta o gasto até aquela hora ----------------------
 novo
@@ -198,6 +201,18 @@ roda --sessao "$SID" --em $((AGORA - 300))
 eq "--em sem --calibrar: uso errado" 2 "$RC"
 roda --sessao "$SID" --calibrar 50 --em ontem
 eq "--em em formato que não é hora: uso errado" 2 "$RC"
+
+# --- leitura do /usage na janela aberta é âncora --------------------------------------
+novo
+u "$M" a 600 0 0 1000 0
+roda --sessao "$SID" --calibrar 50 --em $((AGORA - 500))
+u "$M" c 400 0 0 1000 0
+roda --sessao "$SID" --calibrar 60 --em $((AGORA - 300))
+u "$M" d 60 0 0 400 0
+roda --sessao "$SID"
+tem "âncora: 60% lidos + 400 tokens sobre o menor limite (2.000)" "$SAI" "5h 80%"
+tem "âncora: a nota diz a leitura" "$SAI" "âncora: /usage das"
+eq "âncora: o limite continua o menor ponto" 2000 "$(campo .estimativa.limite)"
 
 # --- janela de aviso aberta por uso que não aparece nos transcripts não calibra -------
 novo

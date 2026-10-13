@@ -1,5 +1,13 @@
 # Registro de mudanças
 
+## 1.2.2 (2026-10-13)
+
+- Leitura do `/usage` como âncora. Caso real: a 2ª leitura (90% às 11:21, contra 73% às 11:04) não fechou com a 1ª em nenhum peso não negativo para a escrita de cache, com a leitura de cache entre 0,01 e 0,1. O mais provável é gasto na janela que os transcripts não veem, como o chat do claude.ai. Com uma leitura dentro da janela aberta, o percentual parte do valor lido, e só o gasto depois dela é estimado, sobre o menor limite entre os pontos. Logo depois de calibrar, a linha deu 93%: os 90% lidos mais 3% estimados.
+- O "Em aberto" da 1.2.1 fica sem medida: as duas leituras não permitem isolar o peso da escrita de cache.
+- 3 casos novos e 5 ajustados em `teste-orcamento-local.sh`.
+
+Revisão: nenhuma revisão independente; feita pelo orquestrador, com os testes automáticos.
+
 ## 1.2.1 (2026-10-13)
 
 - Calibração por pontos. Caso real: na primeira conferência com o `/usage`, a regra da 1.2.0 (mediana dos 20 limites batidos mais recentes) dava cerca de 40% quando o oficial marcava 73%, e nenhum peso testado explicou a diferença. Agora cada leitura do `/usage` também vale como ponto (`--calibrar <pct> --em <hora do relatório>`, contando só o gasto da janela até aquela hora), e o limite é o menor dos 5 pontos mais recentes.
