@@ -19,14 +19,44 @@ Regras para todos:
 - **Agentes do projeto:** um agente em `.claude/agents/` que cubra uma superfície S do perfil é chamado pelo nome no `subagent_type`, com o pacote da seiva no prompt. Confira antes se o arquivo ainda existe: pasta ignorada pelo git não chega a um clone novo.
 - **Worktree:** `isolation: "worktree"` cria a cópia a partir do repositório **em que a sessão abriu**. Se a sessão abriu num clone que não é o vivo, a cópia sai velha. Só use depois de confirmar o repositório na etapa 0. Com outra sessão editando o mesmo repositório em N2 ou N3, sugira a worktree ao usuário.
 - **O que o subagente não tem:** a conversa, a memória da sessão, o `CLAUDE.md` de outro repositório. Tudo vai no pacote.
-- **Tokens:** a notificação de fim de cada subagente traz os tokens usados. Anote no registro.
+- **Tokens:** a notificação de fim de cada subagente traz os tokens usados. Anote no registro, na tabela de agentes; a soma vai para o total da tarefa, junto com o gasto da sessão do orquestrador que o `orcamento-local.sh` mostra (`sessão ≈`).
 
-## Orçamento vivo (só no Claude Code)
+## Orçamento vivo
 
-No Claude Code de terminal (o `claude`), a statusline recebe a cada mensagem o uso das janelas de 5 horas e de 7 dias e o tamanho do contexto da sessão. O `scripts/statusline-orcamento.sh` guarda esses números, e o `scripts/orcamento.sh` os lê antes de cada leva de agentes. Sem a statusline nada disto existe, e a seiva trabalha como sempre, com uma cautela a mais: a Retomada antes de cada leva de N2 ou N3 (veja `desligado`). O app desktop não chama a statusline (veja Limites).
+O `scripts/orcamento-local.sh` lê os transcripts que o Claude Code grava em `~/.claude/projects/`, e o terminal e o app desktop gravam do mesmo jeito. Antes de cada leva ele diz se a seiva pode abrir outra. Não precisa de statusline, de hook nem de terminal, e nada é instalado. A decisão continua com o `scripts/orcamento.sh`, que o próprio `orcamento-local.sh` chama: os limiares são os mesmos de antes.
 
-- **O que é gravado, e onde:** em `${XDG_CACHE_HOME:-$HOME/.cache}/seiva/`, sempre em modo 600. O `orcamento.json` traz `versao`, `harness`, `script` (o caminho do script que gravou), `gravado_em`, `sessao`, `cinco_horas` e `sete_dias` (`usado`, `reinicia` e `visto_em`) e `contexto` (`usado` e `sessao`). O `retomar` guarda o caminho do `registro.md` da tarefa em curso: o `orcamento.sh --tarefa <pasta>` o grava, e a barra o usa para dizer qual tarefa retomar. A statusline é do usuário. A seiva fornece o script, e nenhum script dela escreve no `settings.json`.
-- **Instalação:** só com o usuário. O orquestrador pergunta antes, preenche `SKILL` com o caminho absoluto da skill que está carregada (o harness mostra a pasta base dela; nunca suponha `~/.claude/skills/seiva`, porque a skill pode vir de um clone ou de um plugin) e entrega o bloco abaixo. A instalação é por cópia: atualizar a skill não muda o script que roda a cada mensagem. O bloco para sem mudar nada se o `settings.json` já tem uma `statusLine`. Depois de rodar, o usuário abre uma sessão nova do `claude` no terminal e manda uma mensagem. No app desktop o arquivo não aparece, e isso não indica falha da instalação.
+- **Como se usa:** antes de cada leva, `bash <skill>/scripts/orcamento-local.sh --tarefa <pasta-da-tarefa>`, e leia a palavra depois de `ORCAMENTO`. A linha termina com a fonte (`estimado pelos transcripts`, ou `fonte statusline`), o contexto da sessão contra a janela do modelo e o gasto da sessão com subagentes (`sessão ≈`), que vai para o registro no fechamento. A 1ª vez varre os transcripts dos últimos 30 dias (cerca de 5 segundos em 620 transcripts); depois, só o que mudou.
+- **O que mede:**
+  - cada resposta pesa entrada + saída + escrita de cache + `PESO_CACHE_LEITURA` × leitura de cache, contada uma vez: o transcript repete a mesma resposta numa linha por bloco de conteúdo. O peso padrão é 0,01. Em 53 vezes que a conta do autor bateu no limite, ele deixou o total de cada janela com dispersão de 28%; com 0,1 a dispersão foi de 42%, e sem leitura nenhuma, de 31% (medido em 2026-10-13, uma conta, quase toda em Opus);
+  - a janela de 5 horas começa na 1ª resposta depois do fim da anterior, arredondada para baixo em 10 minutos. Assim bateram 53 das 56 janelas com aviso de limite nos transcripts do autor; as outras 3 foram abertas por uso que não aparece neles. Quando a conta bate no limite, o transcript guarda "You've hit your session limit · resets <hora> (<fuso>)", e essa janela passa a ser a exata;
+  - o percentual é o total da janela dividido pelo limite calibrado. O aviso de limite com hora de reinício no futuro vale 100% e `parar`;
+  - o contexto é o tamanho da última resposta da sessão (entrada + leitura e escrita de cache) sobre a janela do modelo: 1 milhão para o modelo que já passou de 200 mil em algum transcript, 200 mil para os outros, ou o valor de `SEIVA_JANELA_CONTEXTO`. A sessão é a de `CLAUDE_CODE_SESSION_ID`; sem ela, o transcript mais recente da pasta do projeto, com o aviso `sessão deduzida`.
+- **Calibração:** automática. Cada vez que a conta bateu no limite, o total daquela janela até o aviso vale 100%, e o limite é a mediana dos 20 mais recentes. Só entra a janela que os transcripts viram abrir: a aberta pelo claude.ai ou por outra máquina sairia baixa demais. A linha mostra quantos limites entraram e a dispersão deles. Para conferir com o número oficial, o usuário olha o `/usage` (ou a página de uso do claude.ai) e o orquestrador roda `orcamento-local.sh --calibrar <percentual>`: a calibração manual vale até a conta bater no limite de novo. Sem nenhum limite batido nos 30 dias e sem calibração manual, o estado é `desligado`, com o motivo e o comando na linha.
+- **Estados:**
+  - `ok`: segue.
+  - `restrito` (70% ou mais, código 10): N2 e N3 não começam nem abrem leva nova. O usuário pode mandar seguir, e isso vira `D-n` no registro, com o custo se errado. N0 e N1 seguem, com a Próxima ação gravada antes de cada leva. O nível não desce por causa do orçamento: uma tarefa N3 continua N3 e espera o reinício ou a decisão do usuário.
+  - `parar` (código 20): 85% ou mais, limite batido, ou contexto desta sessão em 70% ou mais. Parada limpa em qualquer nível, só na fronteira entre levas ([retomada](retomada.md)). A linha diz se o motivo é o contexto (a sessão nova pode começar já) ou a janela (a sessão nova espera a hora do reinício).
+  - `sem-dado`: a janela reiniciou depois da última gravação; só acontece com o arquivo da statusline. Trate como `desligado`.
+  - `desligado`: sem `jq`, sem transcripts ou sem calibração. Diga uma vez por tarefa o motivo que a linha traz e siga. Em N2 e N3, grave a Próxima ação antes de cada leva: sem o dado, nada avisa que a janela está acabando.
+- **Estouro no meio da leva:** a janela pode acabar com um agente rodando. O que salva o trabalho é a Próxima ação gravada antes da leva, com os relatórios esperados, e o pacote de cada agente em arquivo ([retomada](retomada.md)).
+- **Limites:**
+  - o percentual é estimado. A contabilidade da assinatura não é pública, e o número é freio, não medidor oficial: com dispersão de 25 a 30%, um `ok` de 60% pode ser 45% ou 75% de verdade;
+  - uso fora do Claude Code desta máquina (o chat do claude.ai, outra máquina) não aparece nos transcripts, mas gasta a mesma janela. A calibração automática absorve parte disso; o resto é erro para baixo;
+  - a mistura de modelos não tem peso: uma janela gasta em Haiku pesa como se fosse em Opus. A calibração foi medida numa conta quase só de Opus;
+  - a calibração automática depende do texto em inglês do aviso de limite ("You've hit your session limit · resets ..."). Se o Claude Code mudar esse texto, ela deixa de achar pontos novos e segue com os que já guardou;
+  - `CLAUDE_CODE_SESSION_ID` não é documentada (medida no app desktop em 2026-10-13). Sem ela, a sessão é deduzida, e com duas sessões abertas no mesmo projeto o contexto medido pode ser o da outra;
+  - a janela de contexto vem do histórico do modelo; modelo novo começa em 200 mil até aparecer acima disso, o que só adianta a parada;
+  - o Claude Code apaga transcripts com mais de 30 dias (padrão do `cleanupPeriodDays`). Os pontos de calibração já guardados ficam em `calibracao.json`;
+  - a janela de 7 dias não é estimada, e perto do teto semanal quem decide é o usuário (`/usage`);
+  - em outro harness não há esses transcripts: o estado é `desligado`.
+- **O que é gravado, e onde:** em `${XDG_CACHE_HOME:-$HOME/.cache}/seiva/`, sempre em modo 600: `orcamento-local.json` (o estado, no formato do `orcamento.json` com `fonte`, `cinco_horas.motivo`, `contexto.desta_sessao` e `estimativa`) e `calibracao.json` (os pontos, a calibração manual e o maior contexto visto por modelo). Do transcript só saem números, horários, nomes de modelo e o texto do aviso de limite: nenhum texto de conversa.
+
+### Statusline (opcional, só no terminal)
+
+No `claude` de terminal, a statusline recebe a cada mensagem o percentual oficial das janelas de 5 horas e de 7 dias. Com ela instalada e gravando há menos de 10 minutos, o `orcamento-local.sh` usa o número oficial no lugar da estimativa (`fonte statusline`); o contexto continua vindo do transcript da sessão. No app desktop ela não roda: a aba Code não chama a statusline (confirmado em 2026-10-01), e o `orcamento-local.sh` a ignora quando `CLAUDE_CODE_ENTRYPOINT=claude-desktop`. Sem ela, nada muda nos freios.
+
+- **O que é gravado:** `orcamento.json` (`versao`, `harness`, `script`, `gravado_em`, `sessao`, `cinco_horas` e `sete_dias` com `usado`, `reinicia` e `visto_em`, e `contexto`) e `retomar`, o caminho do `registro.md` da tarefa em curso, que o `--tarefa` grava e a barra usa para dizer qual tarefa retomar. A partir de 70%, a barra termina com `estourou? sessão nova + retome <tarefa>`.
+- **Instalação:** só com o usuário. O orquestrador pergunta antes, preenche `SKILL` com o caminho absoluto da skill que está carregada (o harness mostra a pasta base dela; nunca suponha `~/.claude/skills/seiva`, porque a skill pode vir de um clone ou de um plugin) e entrega o bloco abaixo. A instalação é por cópia: atualizar a skill não muda o script que roda a cada mensagem. O bloco para sem mudar nada se o `settings.json` já tem uma `statusLine`. Depois de rodar, o usuário abre uma sessão nova do `claude` no terminal e manda uma mensagem.
 
 ```bash
 (
@@ -45,13 +75,13 @@ No Claude Code de terminal (o `claude`), a statusline recebe a cada mensagem o u
 ) || echo "PAROU AQUI: o settings.json só muda na linha do mv. Se já existe statusLine, o bloco para de propósito."
 ```
 
-- **Atualização:** depois de atualizar a skill, ou quando o `orcamento.sh` avisar `statusline desatualizada`, o usuário copia o script de novo:
+- **Atualização:** depois de atualizar a skill, ou quando a linha avisar `statusline desatualizada`, o usuário copia o script de novo:
 
 ```bash
 install -m 0755 '<caminho absoluto da skill carregada>/scripts/statusline-orcamento.sh' ~/.claude/statusline-seiva.sh
 ```
 
-- **Volta:** o bloco abaixo tira a `statusLine` do `settings.json`, e só depois apaga a cópia e os arquivos do cache. Se a `statusLine` não for a da seiva, ele para. O `.bak-<data>` que a instalação deixou é o último recurso: desfaz também o que mudou no `settings.json` depois dele.
+- **Volta:** o bloco abaixo tira a `statusLine` do `settings.json`, e só depois apaga a cópia e os arquivos dela no cache (o `orcamento-local.json` e a `calibracao.json` ficam). Se a `statusLine` não for a da seiva, ele para. O `.bak-<data>` que a instalação deixou é o último recurso: desfaz também o que mudou no `settings.json` depois dele.
 
 ```bash
 (
@@ -68,25 +98,7 @@ install -m 0755 '<caminho absoluto da skill carregada>/scripts/statusline-orcame
 ) || echo "PAROU AQUI: se a statusLine não é a da seiva, o bloco para de propósito. O .bak-<data> é o último recurso: ele desfaz também o que mudou no settings depois dele."
 ```
 
-- **Limiares (janela de 5 horas):** antes de cada leva, o orquestrador roda `bash <skill>/scripts/orcamento.sh --tarefa <pasta-da-tarefa>` e lê a palavra depois de `ORCAMENTO`.
-  - `ok`: segue.
-  - `restrito` (70% ou mais, código 10): N2 e N3 não começam nem abrem leva nova. O usuário pode mandar seguir, e isso vira `D-n` no registro, com o custo se errado. N0 e N1 seguem, com a Retomada gravada antes de cada leva. O nível não desce por causa do orçamento: uma tarefa N3 continua N3 e espera o reinício ou a decisão do usuário.
-  - `parar` (85% ou mais, código 20): parada limpa em qualquer nível, só na fronteira entre levas. O agente em curso termina.
-  - `sem-dado`: a janela reiniciou depois da última gravação, e o percentual gravado é da janela anterior. Trate como `desligado` até a statusline gravar de novo.
-  - `desligado`: sem statusline, sem `jq`, sem arquivo legível ou no app desktop sem arquivo. Diga uma vez por tarefa que o orçamento vivo está desligado, com o motivo que a linha traz, e siga. Em N2 e N3, grave a Retomada antes de cada leva: sem o dado, nada avisa que a janela está acabando, e foi a Retomada que salvou o trabalho nas duas quedas por limite de uso da tarefa da 1.1.0.
-  - aviso `app desktop` (qualquer estado menos `desligado`): o dado é da última sessão do terminal e não se atualiza no app. `restrito` e `parar` valem, porque o percentual é piso. `ok` não garante nada: trate como `desligado`.
-- **Parada limpa:** grave a Retomada no `registro.md` (o que rodava, o próximo passo e "retomar em sessão nova") e diga ao usuário a hora do reinício, que a linha do `orcamento.sh` traz, e o caminho absoluto do `registro.md`: `abra uma sessão nova depois das HH:MM e diga: retome <caminho>`. Nunca sugira "Tentar novamente" na sessão gigante: retomar sessão grande recria o cache inteiro, e as maiores quebras medidas foram de 800 a 940 mil tokens (session-report, 30 dias, uma máquina, em 2026-09-29). Na sessão nova, o orquestrador lê a Retomada do registro e segue do passo gravado.
-- **Estouro no meio da leva:** a janela pode acabar com um agente rodando. O que salva o trabalho é a Retomada gravada antes da leva. A barra ajuda: a partir de 70% ela termina com `estourou? sessão nova + retome <tarefa>`, com o nome da pasta que o `--tarefa` gravou.
-- **Como ler o dado:** o percentual gravado vale como piso até a janela reiniciar, porque o uso só cresce dentro dela. Depois da hora do reinício, o estado é `sem-dado`. A idade aparece na linha (`dado de <n> min`) e conta desde a última vez que a barra recebeu dado da janela. O leitor avisa `statusline desatualizada` quando a cópia instalada difere da do repositório, e `versão da statusline não conferida` quando não consegue comparar.
-- **Limites:**
-  - só chega `rate_limits` para assinante Pro ou Max, e só depois da 1ª resposta da sessão (documentação oficial da statusline do Claude Code, lida em 2026-09-29);
-  - o contexto é o da última sessão que gravou, não o de todas;
-  - a aba Code do app desktop não chama a statusline. Foi confirmado em 2026-10-01: com a `statusLine` no `settings.json` e o script instalado funcionando quando rodado à mão, nenhum arquivo foi gravado depois de várias mensagens numa sessão nova do app. O app define `CLAUDE_CODE_ENTRYPOINT=claude-desktop` nos comandos que o agente roda, e o leitor usa essa variável só para dar o motivo certo: sem arquivo, diz que é o app; com arquivo, avisa que o dado é do terminal. A variável não é documentada. Se ela mudar, o motivo volta a ser o genérico, que também cita o app, e um arquivo antigo do terminal volta a sair `ok` sem aviso: a Retomada antes de cada leva deixa de ser lembrada. Nas extensões de IDE nada foi medido. Rodado pelo usuário num terminal à parte, o leitor não sabe do app e dá o motivo genérico;
-  - a decisão olha só a janela de 5 horas: a de 7 dias aparece na linha, mas não trava nada, e perto do teto semanal quem decide é o usuário (`/usage`);
-  - o `retomar` vale por 6 horas depois da última leva; mais velho, a barra volta ao texto genérico;
-  - em outro harness o leitor diz `desligado`: a statusline é do Claude Code;
-  - duas sessões gravando ao mesmo tempo podem perder uma atualização, que a mensagem seguinte corrige;
-  - a barra pode estar uma mensagem atrás (a atualização espera 300 ms e é cancelada se outra chega), então a idade do dado fica visível.
+- **Limites da statusline:** só chega `rate_limits` para assinante Pro ou Max, e só depois da 1ª resposta da sessão (documentação oficial, lida em 2026-09-29); duas sessões gravando ao mesmo tempo podem perder uma atualização; a barra pode estar uma mensagem atrás, então a idade do dado aparece na linha (`dado de <n> min`); rodado à mão, o `orcamento.sh` sobre o arquivo da statusline mantém os avisos de antes (`statusline desatualizada`, `app desktop`).
 
 ## Codex CLI
 

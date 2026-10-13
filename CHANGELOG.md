@@ -1,5 +1,30 @@
 # Registro de mudanças
 
+## 1.2.0 (2026-10-13)
+
+Objetivo: o mesmo processo (revisão independente, prova, segurança) com menos tokens, e funcionando no app desktop do Claude Code, onde a statusline não roda. Plano de origem: `plano-execucao-otimizacao-seiva.md`, do autor.
+
+- **Orçamento vivo pelos transcripts** (`scripts/orcamento-local.sh`). Lê os transcripts que o terminal e o app desktop gravam em `~/.claude/projects/`, estima o uso da janela de 5 horas e mede o contexto da sessão. Grava no formato do `orcamento.json` e passa a decisão ao `orcamento.sh`, com os mesmos limiares. Caso real: a seiva roda quase sempre no app desktop, onde o orçamento vivo da 1.1 ficava desligado. Medido nesta máquina: a 1ª varredura de 30 dias leva cerca de 5 segundos, e as seguintes, menos de 1.
+  - Calibração automática: o transcript guarda "You've hit your session limit · resets <hora>", e o total de cada janela que bateu no limite vale 100%. Calibração manual por `--calibrar <percentual do /usage>`.
+  - O peso padrão da leitura de cache é 0,01, e não 0,1 como o plano propunha: nas 53 vezes que a conta do autor bateu no limite, 0,01 deixou o total das janelas com dispersão de 28%, e 0,1, com 42%. `PESO_CACHE_LEITURA` muda o peso.
+  - A janela de contexto vem do histórico do modelo (1 milhão para o que já passou de 200 mil), porque as sessões do autor passam de 600 mil tokens de contexto.
+  - `orcamento.sh` aceita os campos novos `fonte`, `cinco_horas.motivo` e `contexto.desta_sessao`; com `fonte: "jsonl"` não dá os avisos de statusline nem de app desktop. Contexto desta sessão em 70% ou mais vira `parar`. Arquivo da statusline lido à mão se comporta como antes.
+- **Retomada barata** (`scripts/progresso.sh`, `moldes/progresso.md`, `moldes/contexto-tarefa.md`, `referencias/retomada.md`). Cada tarefa nasce com o checklist das etapas, com hash dos artefatos, e um contexto de até 1.500 tokens. A sessão nova lê só os dois; etapa feita não roda de novo; leva que caiu redispara só quem não entregou. No ensaio automático, a retomada de uma N2 caída no meio da leva do plano lê cerca de 700 tokens. A seção Estado do registro foi para o `progresso.md`, e a Retomada do registro virou uma linha por parada.
+- **Revisores sem o arquivo inteiro** (`scripts/ficha-tecnica.sh`). Fichas por arquivo (importa, exporta, assinaturas, linhas-chave) e trechos de ±10 linhas em volta de cada citação do batedor, por expressão regular, sem modelo, com segredo mascarado. Medido em arquivos reais do Ciclo Arboris: um arquivo de rotas de 73 KB vira uma ficha de 6 KB, e um documento de 451 KB, uma de 2 KB. Só o implementador lê inteiros os arquivos que vai mudar.
+- **Portões enxutos** (`scripts/julgar-pre.sh`). Achados numerados com ID estável na tarefa e agrupados por lugar antes do julgamento; na conversa fica uma linha por achado. Teto de 2 rodadas por portão em N2 e 3 em N3. Em N2, o portão do código é o adversário em uma rodada, com lente só para sinal novo no diff, achado do plano conferido pelo ID em uma linha e 2ª rodada só por CRÍTICO.
+- **Triagem e modelos.** Dúvida entre dois níveis vira uma pergunta de sim ou não. Pedido de rigor sem superfície sensível vale N1 com dois revisores. Em N2, construtor e adversário vão para `padrao`.
+- **Aprendizado.** O registro anota as correções do usuário (`C-n`), que viram proposta no fechamento. A linha de `aprendizado.md` compara o custo real com o orçado e soma a sessão do orquestrador aos subagentes.
+- Casos novos: T8, T9, C11 a C13, M3, O9 a O11, R1 a R4, E2 e E3; O1 a O8 e C4 atualizados. Testes automáticos novos: `teste-orcamento-local.sh`, `teste-progresso.sh`, `teste-ficha-tecnica.sh` e `teste-julgar-pre.sh`.
+
+Fora desta versão, de propósito:
+- O `sqz` não substituiu o `enxugar.sh` (motivos em FONTES.md): ele devolve à conversa a saída inteira, só que encolhida, enquanto o enxugar guarda a saída e devolve até 51 linhas; a referência de 13 tokens aponta para conteúdo que o subagente de contexto limpo nunca viu; e ele não mascara segredo.
+- O claude-recall não foi adotado: instala hook e injeta regra em toda sessão. A captura de correções ficou no registro da tarefa.
+- Gateways e roteadores (OmniRoute, LiteLLM, RouteLLM e outros) e cache semântico ficaram para uma fase opcional de infraestrutura, não feita.
+
+Custo: a cada leva, uma chamada do `orcamento-local.sh` (menos de 1 segundo, uma linha na conversa) e uma edição de 3 linhas no `contexto-tarefa.md`; por etapa, uma chamada do `progresso.sh`; por rodada, uma do `julgar-pre.sh`. Em N2, a troca de `forte` para `padrao` no construtor e no adversário reduz a independência do portão do plano para `mesmo-modelo-contexto-limpo`. A meta do plano, N2 com até 40% dos tokens de antes, ainda não foi medida: depende das tarefas reais anotadas com a 1.2.0.
+
+Revisão: nenhuma revisão independente. A versão foi escrita e testada pelo orquestrador (Opus) sozinho, sem enxame e sem revisor de contexto limpo. Os scripts têm teste automático e o `orcamento-local.sh` rodou no app desktop; as regras de texto só têm os casos de `testes/casos.md`, que ainda não foram rodados numa sessão real.
+
 ## 1.1.1 (2026-10-01)
 
 - O app desktop não chama a statusline, e isso agora está confirmado. Caso real: numa sessão nova do app, com a `statusLine` no `settings.json` e o script instalado funcionando quando rodado à mão, nenhum arquivo de orçamento foi gravado depois de várias mensagens. No app, o orçamento vivo fica desligado. A exceção é o dado que uma sessão do terminal gravou antes: ele vale como piso, mas não se atualiza.

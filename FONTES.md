@@ -28,6 +28,14 @@ Levantamento feito em 2026-09-26, só leitura: nada foi instalado nem executado 
 
 O RTK e o Context Mode foram estudados no mesmo levantamento, mas não inspiraram a 1.1.0 e ficam de fora. As fontes do podador, do observador e da revisão externa entram com a entrega delas.
 
+## Levantamento de 2026-10-13 (versão 1.2)
+
+| Projeto | Licença | Versão lida | O que inspirou |
+|---|---|---|---|
+| [ccusage/ccusage](https://github.com/ccusage/ccusage) | MIT | README do `main` lido em 2026-10-13 | A ideia de tirar o uso dos transcripts locais do Claude Code e de contar por janela de 5 horas. O código não foi lido: a regra de janela (arredondada em 10 minutos), a deduplicação por resposta e a calibração pelo aviso de limite foram medidas nos transcripts desta máquina. A seiva não depende dele |
+| [ojuschugh1/sqz](https://github.com/ojuschugh1/sqz) | Apache-2.0 ou MIT | README do `main` lido em 2026-10-13 (versão mais recente não informada na página) | Estudado e não adotado (ver abaixo) |
+| [raoulbia-ai/claude-recall](https://github.com/raoulbia-ai/claude-recall) | MIT | README do `main` lido em 2026-10-13 | A ideia de tratar a correção do usuário como evidência para a evolução. O mecanismo não foi adotado (ver abaixo) |
+
 ## Estudos e textos
 
 - Anthropic, *How we built our multi-agent research system*, 2025-06-13: multiagente gasta cerca de 15 vezes os tokens de um chat; tarefas acopladas, como boa parte das de código, paralelizam mal.
@@ -48,3 +56,6 @@ O RTK e o Context Mode foram estudados no mesmo levantamento, mas não inspirara
 - **Personas com nome e tom teatral:** não melhoram o resultado e gastam token.
 - **Prosa em caixa-alta e ameaça ("VOCÊ DEVE")**: estrutura e critério fazem o trabalho que a pressão retórica não faz.
 - **Números de custo e acerto divulgados pelos próprios projetos sem verificação independente.**
+- **sqz no lugar do enxugar** (2026-10-13): a compressão dele devolve à conversa a saída inteira, só que encolhida, enquanto o enxugar guarda a saída e devolve até 51 linhas, seja qual for o tamanho dela; a deduplicação troca conteúdo repetido por uma referência de 13 tokens que só serve a quem já viu o original, e o subagente de contexto limpo nunca viu; e ele não mascara segredo.
+- **claude-recall** (2026-10-13): captura correções com um hook a cada mensagem e injeta regras em toda sessão. É o custo fixo que a seiva recusa.
+- **Gateways, roteadores e cache semântico** (OmniRoute, FreeLLMAPI, LiteLLM, Portkey, Helicone, RouteLLM, GPTCache, Headroom como proxy): citados no plano da 1.2 como fase opcional de infraestrutura, fora do repositório da skill. Não foram estudados a fundo nem adotados.

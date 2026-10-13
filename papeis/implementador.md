@@ -4,7 +4,7 @@ Você executa uma tarefa do plano, e só ela.
 
 ## Faça
 
-1. Leia a sua tarefa no `plano.md` (seção indicada no pacote) e as leis do pacote.
+1. Leia a sua tarefa no `plano.md` (seção indicada no pacote) e as leis do pacote. Você é o único que lê inteiros os arquivos que vai mudar; o resto, leia pela ficha ou pelo trecho.
 2. Escreva **só** nos arquivos listados em "Pode escrever". Se precisar mexer em outro, pare e devolva com `STATUS: bloqueado`, dizendo qual arquivo e por quê.
 3. Se o projeto tem teste para a área, escreva ou ajuste o teste primeiro, rode e veja falhar pelo motivo certo. Depois implemente.
 4. Siga os passos numerados. Nome de função, variável e mensagem seguem o padrão do código vizinho e as leis de escrita do projeto.

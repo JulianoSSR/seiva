@@ -12,14 +12,20 @@ Modelos avaliam melhor o próprio texto (autopreferência), tendem a concordar c
 
 ## Portões
 
-| Portão | Revisores | Entrada |
-|---|---|---|
-| Plano (etapa 4) | adversário + lentes acionadas | `plano.md` + relatório do batedor |
-| Código (etapa 8) | lentes recalculadas pelo diff (+ adversário em N3, ou quando nenhuma lente acionar) | `diff.patch` (de `scripts/diff-tarefa.sh`) + `plano.md` |
+| Portão | N1 | N2 | N3 | Entrada |
+|---|---|---|---|---|
+| Plano (etapa 4) | — | adversário + lentes acionadas, até 2 rodadas | adversário + lentes, até 3 rodadas | `plano.md`, relatório do batedor, fichas e `trechos.md` |
+| Código (etapa 8) | 1 revisor (a lente acionada, ou o adversário), 1 rodada | adversário em 1 rodada; lente só com sinal novo no diff; 2ª rodada só por CRÍTICO confirmado | lentes recalculadas pelo diff + adversário, até 3 rodadas | `diff.patch` (de `scripts/diff-tarefa.sh`), `plano.md`, fichas dos arquivos do diff, IDs abertos de `achados.md` |
 
 Revisores rodam em paralelo e só leem. Nenhum revisor corrige o que audita.
 
+**N2, portão do código.** Em N2 as lentes atacam o plano, onde a proteção ainda é barata. No diff, o adversário revisa sozinho, a não ser que o diff real acione um sinal que o plano não previa (uma rota nova, uma escrita em tabela que não estava nas tarefas): aí entra a lente desse sinal, e só ela. Lente que atacou o plano não roda de novo. Cada achado dela, se foi aceito, virou tarefa ou risco `R-n` no plano: o verificador confere na etapa 7 se a mitigação está no código, e o adversário cita o ID em uma linha (`A-3 → mitigado em arquivo:linha`) quando passa por ele. ALTO confirmado no diff volta ao implementador, e o orquestrador confere o conserto com o comando e o `arquivo:linha`, sem rodada nova de revisor; a entrega diz que essa conferência não teve revisor independente.
+
+**Pedido de rigor sem superfície sensível** ([triagem](triagem.md)): N1 com dois revisores no portão do código, de modelos diferentes quando der.
+
 ## Julgamento (etapas 5 e 8)
+
+Antes de julgar, `scripts/julgar-pre.sh <pasta> <plano|codigo> <relatórios>` lê os relatórios da rodada, dá a cada achado um ID da tarefa (estável entre rodadas e portões), agrupa os que apontam o mesmo arquivo a até 3 linhas de distância e escreve em `achados.md` uma linha por achado, com a origem. Na conversa fica só a tabela que ele devolve. O detalhe (cenário, prova, correção) o orquestrador abre no relatório, pela origem, só para o que vai conferir. O script não julga: agrupar por causa e dar o veredito continua aqui.
 
 Para cada achado, o orquestrador:
 
@@ -41,11 +47,11 @@ Nenhum achado some em silêncio.
 
 ## Critério de parada
 
-- Teto de **3 rodadas** por portão.
-- Uma rodada só é aberta por achado **CRÍTICO ou ALTO confirmado**.
+- Teto por portão: **1 rodada em N1, 2 em N2 e 3 em N3**.
+- Uma rodada só é aberta por achado **CRÍTICO ou ALTO confirmado**. No portão do código em N2, só por **CRÍTICO**.
 - O portão fecha quando uma rodada termina sem CRÍTICO nem ALTO confirmado **novo**.
 - Estourou o teto com CRÍTICO ou ALTO aberto: pare e leve ao usuário o achado, as tentativas e as opções.
-- Revisão de uma rodada seguinte recebe só o que mudou (o registro de mudanças do plano, ou o diff novo) e os achados abertos, não tudo de novo.
+- Revisão de uma rodada seguinte recebe só o que mudou (o registro de mudanças do plano, ou o diff novo) e as linhas dos achados abertos em `achados.md`, não o texto inteiro deles nem tudo de novo.
 
 O ganho da revisão cai rápido depois da segunda rodada; estudos de debate entre modelos mostram o platô por volta da terceira. Rodada a mais além disso é custo sem retorno.
 
@@ -63,4 +69,4 @@ Vale para todas as lentes:
 
 ## Independência honesta
 
-Cada portão registra a independência que teve de fato: `outro-provedor`, `outro-modelo`, `mesmo-modelo-contexto-limpo` ou `mesmo-contexto`. A entrega repete essa informação. Nunca diga "revisão independente" quando foi o mesmo modelo no mesmo contexto.
+Cada portão registra a independência que teve de fato: `outro-provedor`, `outro-modelo`, `mesmo-modelo-contexto-limpo` ou `mesmo-contexto`. Em N2 o construtor e o adversário ficam no `padrao`: a independência é `mesmo-modelo-contexto-limpo`, a não ser que o perfil ponha o adversário em outra categoria. A entrega repete essa informação. Nunca diga "revisão independente" quando foi o mesmo modelo no mesmo contexto.

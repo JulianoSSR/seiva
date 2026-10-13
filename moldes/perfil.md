@@ -35,7 +35,7 @@ Repositório vivo: `<caminho absoluto>` · pasta de trabalho da seiva: `<.claude
 - I1 <regra> — `<arquivo:linha>`
 
 ## M · Modelos
-<Só se diferente do padrão da seiva. Categoria → modelo.>
+<Só se diferente do padrão da seiva. Categoria → modelo, ou papel por nível (ex.: N2: adversário forte).>
 <Indisponíveis na conta: profundo → forte, desde AAAA-MM-DD>
 
 ## Ambíguos (perguntar ao usuário)

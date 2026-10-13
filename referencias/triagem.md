@@ -23,10 +23,10 @@
 
 Regras:
 
-- Na dúvida entre dois níveis, fica o maior.
+- Na dúvida entre dois níveis, faça ao usuário **uma** pergunta de sim ou não que decida (por exemplo: "essa listagem pode mostrar registro de outro cliente?"). Ela custa quase nada perto de subir o nível à toa, que multiplica os agentes. O nível só sobe com superfície sensível concreta, que se cita no pedido, no relatório do batedor ou no diff, ou com pedido explícito. Se o usuário pediu para seguir sem perguntas, fica o maior.
 - **Item que o projeto já registrou com gravidade** (um bug com severidade medida, um risco classificado) é o ponto de partida. Subir ou descer exige uma linha de motivo no registro. Como o registro pode estar velho, a medição do batedor pode mudar o nível.
 - O nível sobe sozinho quando uma etapa encontra superfície sensível. Descer exige dizer ao usuário por quê.
-- Pedido explícito de rigor ("revisa tudo", "não pode dar erro") vale como N2 no mínimo.
+- Pedido explícito de rigor ("revisa tudo", "não pode dar erro") sem superfície sensível citável vale N1 com um revisor a mais: dois revisores no portão do código, de modelos diferentes quando der. Com superfície citável, vale o nível dela, N2 no mínimo.
 - Pedido de pressa não rebaixa um N3: diga o risco e pergunte.
 
 ## Sinais que acionam cada lente
@@ -45,7 +45,7 @@ Leia o pedido, o relatório do batedor, o plano e, na etapa 8, o diff. **Anote n
 
 **Invasor:** varredura de segurança do sistema inteiro, a pedido do usuário ou em tarefa de segurança N3 ([papel](../papeis/invasor.md)). O relatório dele passa por um revisor de segurança antes de virar conserto.
 
-**Adversário:** revisa o plano em N2 e N3 e o diff em N3. Em qualquer nível, se nenhuma lente acionar no diff, o adversário faz a revisão do diff.
+**Adversário:** revisa o plano em N2 e N3 e o diff em N2 e N3. Em N2, no diff, só entra junto com ele a lente de um sinal que o plano não previa ([revisão](revisao.md)). Em N1, se nenhuma lente acionar no diff, o adversário é o revisor.
 
 **Teto:** até 4 revisores por portão. Se acionarem mais, junte lentes afins no mesmo agente (desempenho com operação, contrato com dados) ou parta a tarefa.
 
@@ -58,7 +58,7 @@ Um N3 grande vira etapas menores, cada uma com entrega própria. Sinais: plano c
 ```
 Nível: N2 — regra de negócio nova em 4 arquivos; usa o filtro de cliente existente sem mudá-lo
 Superfícies: dados (escrita em tabela), contrato (app instalado lê o campo)
-Lentes: plano → adversário, dados (sinal: escrita em tabela), contrato (sinal: campo lido pelo app) · diff → recalcular
-Categorias: batedor rapido · construtor forte · adversário forte · lentes padrao · implementador padrao · verificador padrao
+Lentes: plano → adversário, dados (sinal: escrita em tabela), contrato (sinal: campo lido pelo app) · diff → adversário + lente de sinal novo
+Categorias: batedor rapido · construtor padrao · adversário padrao · lentes padrao · implementador padrao · verificador padrao
 Orçamento: 8 agentes · paradas com o usuário: plano, entrega
 ```

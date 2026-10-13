@@ -6,8 +6,8 @@ O orquestrador pede uma **categoria**; o mapa abaixo, ou a seção M do perfil, 
 |---|---|---|
 | `script` | contar, listar, hash, diff, rodar teste, lint e build, extrair campos | nenhum: se é mecânico, é script |
 | `rapido` | localizar código, ler e resumir arquivos, medir premissa com comando, medir uma suspeita | precisou interpretar regra de negócio ou decidir entre caminhos |
-| `padrao` | implementar tarefa bem descrita, escrever teste, lente em N2, verificação, montar o perfil | deu mais de duas voltas no mesmo erro |
-| `forte` | plano (N2 e N3), adversário em N2, lente em N3, implementação delicada (migração, concorrência, cálculo), julgamento difícil | — |
+| `padrao` | implementar tarefa bem descrita, escrever teste, plano, adversário e lentes em N2, verificação, montar o perfil | deu mais de duas voltas no mesmo erro |
+| `forte` | plano e lentes em N3, implementação delicada (migração, concorrência, cálculo), julgamento difícil | — |
 | `profundo` | adversário em N3, decisão de arquitetura, bug que resistiu a duas tentativas | — |
 
 O orquestrador é o modelo da sessão. Se a sessão está num modelo pequeno e a tarefa é N3, peça ao usuário uma sessão mais forte.
@@ -15,15 +15,15 @@ O orquestrador é o modelo da sessão. Se a sessão está num modelo pequeno e a
 ## Regras
 
 1. **A categoria vem da tarefa, não do papel.** Implementar uma migração delicada é `forte`, mesmo sendo "só implementação".
-2. **O revisor fica acima do construtor, ou em outro modelo.** Por isso, em N3, o construtor é `forte` e o adversário é `profundo`. Nunca é a mesma instância.
+2. **O revisor fica acima do construtor, ou em outro modelo, quando o risco pede.** Em N3, o construtor é `forte` e o adversário é `profundo`. Em N2, os dois ficam no `padrao`: o adversário é outra instância, de contexto limpo, e a independência declarada é `mesmo-modelo-contexto-limpo`. Projeto que quer o adversário de N2 acima do construtor diz isso na seção M do perfil (`N2: adversário forte`). Nunca é a mesma instância.
 3. **Escalada**, a regra única para toda repetição (verificação que falhou, correção de achado, relatório sem prova):
-   - rodada 2: agente novo, **mesma** categoria, com o erro anterior no pacote;
+   - rodada 2: agente novo, **mesma** categoria, com o erro anterior no pacote: o caminho da saída guardada e até 3 linhas de resumo, nunca a saída inteira;
    - rodada 3: uma categoria acima;
    - `profundo` que falha: pare e leve ao usuário. Não existe categoria acima.
 4. **Voltas custam mais que preço.** Se o `rapido` precisaria de um passo a passo longo demais para acertar, use o `padrao`.
 5. **Modelo pequeno pede prompt explícito:** passos numerados, critério de pronto, o que não fazer e formato de saída.
 6. **Independência declarada.** Da mais forte para a mais fraca: `outro-provedor`, `outro-modelo`, `mesmo-modelo-contexto-limpo`, `mesmo-contexto`. Toda revisão registra qual teve.
-7. **Tokens:** quando o harness informa os tokens de cada subagente (o Claude Code informa na notificação de fim), anote no registro. É o dado que calibra o orçamento.
+7. **Tokens:** quando o harness informa os tokens de cada subagente (o Claude Code informa na notificação de fim), anote no registro. No fechamento, some e acrescente o gasto da sessão do orquestrador (`sessão ≈` na linha do `orcamento-local.sh`). É o dado que compara o custo real com o orçamento da triagem.
 
 ## Modelo indisponível
 

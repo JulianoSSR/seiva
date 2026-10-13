@@ -9,9 +9,9 @@ description: |
   deploy, integração externa), em bug que já voltou, ou quando pedirem "seiva", "enxame",
   "planeja e revisa" ou "sem retrabalho". Em tarefa trivial, manda fazer direto.
 license: MIT
-compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo e enxugar usam jq, sed GNU e timeout.
+compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo, enxugar, fichas e pré-julgamento usam jq, sed GNU e timeout.
 metadata:
-  version: "1.1.1"
+  version: "1.2.0"
 ---
 
 # Seiva
@@ -28,9 +28,9 @@ Este arquivo é para o **orquestrador**, a sessão principal. Ele classifica, de
 4. **O modelo mais barato que dá conta.** A categoria vem da tarefa, não do papel. Conte as voltas, não só o preço: o modelo pequeno que erra três vezes sai mais caro que o médio que acerta na primeira.
 5. **Quem constrói não aprova.** Revisor é outro agente, de contexto limpo, sem o histórico da conversa e, de preferência, de outro modelo. Toda revisão declara a independência que teve de fato.
 6. **Sem prova não conta.** Achado sem evidência (`arquivo:linha`, comando e saída) não bloqueia. "Pronto" sem comando e saída não conclui.
-7. **Arquivo, não conversa.** Entre agentes circulam caminhos de arquivo e relatórios curtos. O diff vai em arquivo, a lei vai por ID do perfil e documento grande nunca vai inteiro.
+7. **Arquivo, não conversa.** Entre agentes circulam caminhos de arquivo e relatórios curtos. O diff vai em arquivo, a lei vai por ID do perfil, código vai por ficha e trecho, e documento grande nunca vai inteiro. A sessão é descartável: o estado da tarefa mora na pasta dela, e um fato pago uma vez não se paga de novo.
 8. **Um dono por arquivo.** Só roda em paralelo o que não toca o mesmo arquivo. Arquivo compartilhado é do orquestrador.
-9. **Revisão com teto.** No máximo 3 rodadas por portão. Só achado CRÍTICO ou ALTO confirmado reabre rodada. O resto vira registro, não loop.
+9. **Revisão com teto.** Até 2 rodadas por portão em N2 e 3 em N3. Só achado CRÍTICO ou ALTO confirmado reabre rodada; no portão do código em N2, só CRÍTICO. O resto vira registro, não loop.
 10. **Premissa se mede.** Cada premissa do plano traz o comando que a mediu e o resultado, ou fica marcada como suposição.
 11. **Nada escondido.** Limitação, suposição, risco aceito, achado não corrigido e decisão tomada sem o usuário aparecem na entrega, em texto.
 12. **Evolui por evidência.** Defeito que escapou vira pergunta de lente; lente que nunca acha nada perde gatilho. Regra só muda com aprovação de quem desenvolve ([evolução](referencias/evolucao.md)).
@@ -42,52 +42,53 @@ Este arquivo é para o **orquestrador**, a sessão principal. Ele classifica, de
 | 0 Terreno | script + `padrao` | `perfil.md` (cache) | usa se existir | ✓ | ✓ | ✓ |
 | 1 Triagem | orquestrador | `registro.md` | de cabeça | ✓ | ✓ | ✓ |
 | 2 Reconhecer | batedor `rapido` | mapa + premissas medidas | — | se preciso | ✓ | ✓ |
-| 3 Propor | construtor `forte` | `plano.md` | — | 5 linhas no registro | ✓ | ✓ |
+| 3 Propor | construtor `padrao` (N2), `forte` (N3) | `plano.md` | — | 5 linhas no registro | ✓ | ✓ |
 | 4 Atacar o plano | adversário + lentes | achados | — | — | ✓ | ✓ |
 | 5 Decidir | orquestrador + usuário | plano aprovado | — | — | ✓ | ✓ |
 | 6 Construir | implementador | código + relatório | o orquestrador | ✓ | ✓ | ✓ |
 | 7 Verificar | verificador | prova | comandos do projeto | ✓ | ✓ | outro modelo |
-| 8 Atacar o código | lentes (+ adversário) | achados | — | 1 revisor | ✓ | lentes + adversário |
+| 8 Atacar o código | adversário (+ lentes) | achados | — | 1 revisor | adversário + lente de sinal novo | lentes + adversário |
 | 9 Entregar e aprender | orquestrador | entrega + aprendizado | ✓ | ✓ | ✓ | ✓ |
 
-Os níveis estão em [triagem](referencias/triagem.md). Na dúvida, o maior. O nível sobe sozinho quando uma etapa encontra superfície sensível; descer exige dizer ao usuário por quê.
+Os níveis estão em [triagem](referencias/triagem.md). Na dúvida entre dois, uma pergunta de sim ou não ao usuário. O nível sobe sozinho quando uma etapa encontra superfície sensível; descer exige dizer ao usuário por quê.
 
 ### 0 · Terreno
 
 1. Confirme que o repositório é o vivo. **Antes** dos comandos, releia o que as instruções do projeto e a memória da sessão dizem sobre onde ele fica. Depois rode `git rev-parse --show-toplevel`, `git log -1 --format='%h %cs %s'` e `git status --short`. Pare e avise se o caminho diverge do que a memória cita, ou se o último commit é antigo demais para o que se sabe do projeto. Um repositório git válido não prova que é o certo. Git recusando por "dubious ownership": veja [terreno](referencias/terreno.md), sem mexer na configuração global.
 2. Pasta de trabalho: `.claude/seiva/` quando o git já ignora `.claude/`; senão `.seiva/`, e pergunte ao usuário se ela deve ser ignorada ou versionada.
 3. Perfil: se `perfil.md` existe, rode `scripts/impressao.sh` sobre as fontes listadas nele. Impressões iguais: use o perfil como está. Diferentes: refaça só as seções da fonte que mudou. Sem perfil: crie seguindo [terreno](referencias/terreno.md). Na criação, e sempre que uma atualização mudar as seções L, P, V ou E, mostre ao usuário o que mudou antes de usar. Um erro no perfil se propaga para todos os agentes.
+4. Tarefa em curso: com "retome <caminho>", com "continue" ou "tentar novamente", ou numa sessão que voltou de pausa por limite de uso, siga [retomada](referencias/retomada.md) sem esperar pedido: `scripts/progresso.sh <pasta> pendentes`, depois só o `contexto-tarefa.md` e o `conferir`. Etapa feita não roda de novo.
 
 ### 1 · Triagem
 
-1. Crie a pasta da tarefa com `scripts/nova-tarefa.sh <pasta> <slug>`. O script grava no registro a foto do `git status` de agora, que separa depois o que é desta tarefa do que é de outra sessão.
+1. Crie a pasta da tarefa com `scripts/nova-tarefa.sh <pasta> <slug>`. Ela já nasce com `progresso.md` e `contexto-tarefa.md`, e o script grava no registro a foto do `git status` de agora, que separa depois o que é desta tarefa do que é de outra sessão.
 2. Classifique nível, superfícies, lentes (com o sinal que acionou cada uma), categoria de cada papel e orçamento de agentes ([triagem](referencias/triagem.md)). Se o projeto já registrou o item com gravidade, parta dela; divergir exige uma linha de motivo.
 3. **Escape:** se a tarefa corrige defeito, procure os arquivos envolvidos na seção "Arquivos entregues" das tarefas anteriores (`tarefas/*/registro.md`). Achou: registre o escape antes de começar ([evolução](referencias/evolucao.md)).
 4. Diga ao usuário, em até 5 linhas: nível e motivo, lentes, orçamento e em que pontos vai parar para ouvi-lo. Se o perfil exige pergunta antes de acionar skill ou operação cara, faça aqui, numa pergunta só. Skill que aparecer como necessária mais adiante é perguntada na hora, pelo protocolo do projeto.
 
 ### 2 · Reconhecer
 
-Batedor `rapido`, somente leitura ([papel](papeis/batedor.md)). Ele mapeia onde está o código, quem chama, quem depende e o que já existe de parecido, usando a ferramenta de exploração que o perfil indicar. Também mede cada premissa com um comando. Em bug, descreve o defeito como padrão, busca esse padrão no sistema inteiro, conta as ocorrências e separa por risco. Entrega em `relatorios/batedor-1.md`.
+Batedor `rapido`, somente leitura ([papel](papeis/batedor.md)). Ele mapeia onde está o código, quem chama, quem depende e o que já existe de parecido, usando a ferramenta de exploração que o perfil indicar. Também mede cada premissa com um comando. Em bug, descreve o defeito como padrão, busca esse padrão no sistema inteiro, conta as ocorrências e separa por risco. Entrega em `relatorios/batedor-1.md`, citando `caminho:linha`. Em seguida, `scripts/ficha-tecnica.sh <pasta> --de relatorios/batedor-1.md` gera a ficha de cada arquivo citado e o `trechos.md`: é com eles que revisores e verificador trabalham, nunca com o arquivo inteiro, e ninguém relê o que o relatório já cobre.
 
 ### 3 · Propor
 
-Construtor `forte` ([papel](papeis/construtor.md)) escreve `plano.md` a partir do [molde](moldes/plano.md). Recebe o pedido literal, os IDs do perfil que valem e o caminho do relatório do batedor. O plano planta as perguntas das lentes acionadas como riscos com mitigação verificável: segurança e dados entram no plano, não depois. Em N2 ou acima, comportamento novo sem teste vira tarefa de teste, ou uma decisão `D-n` que o usuário aceita.
+Construtor (`padrao` em N2, `forte` em N3; [papel](papeis/construtor.md)) escreve `plano.md` a partir do [molde](moldes/plano.md). Recebe o pedido literal, os IDs do perfil que valem e o caminho do relatório do batedor. O plano planta as perguntas das lentes acionadas como riscos com mitigação verificável: segurança e dados entram no plano, não depois. Em N2 ou acima, comportamento novo sem teste vira tarefa de teste, ou uma decisão `D-n` que o usuário aceita.
 
 ### 4 · Atacar o plano
 
 Em paralelo, somente leitura, contexto limpo:
 
-- **Adversário** ([papel](papeis/adversario.md)): pre-mortem ("isto já quebrou em produção; por quê?") e verificação de trás para a frente (cada critério de aceite sai mesmo das tarefas?). Categoria `forte` em N2 e `profundo` em N3, acima do construtor e em outro modelo.
+- **Adversário** ([papel](papeis/adversario.md)): pre-mortem ("isto já quebrou em produção; por quê?") e verificação de trás para a frente (cada critério de aceite sai mesmo das tarefas?). Categoria `padrao` em N2, no mesmo modelo do construtor e de contexto limpo (a entrega declara), e `profundo` em N3, acima do construtor e em outro modelo.
 - **Lentes acionadas** ([papeis/lentes](papeis/lentes/)), mais as lentes do projeto listadas no perfil. Categoria `padrao` em N2 e `forte` em N3.
 
-Cada um recebe o caminho do plano e do relatório do batedor, os IDs do perfil, o próprio papel, o formato de achado ([contratos](referencias/contratos.md)) e a lista "O que não é achado" ([revisão](referencias/revisao.md)). Não recebe a conversa.
+Cada um recebe o caminho do plano, do relatório do batedor, das fichas e do `trechos.md`, os IDs do perfil, o próprio papel, o formato de achado ([contratos](referencias/contratos.md)) e a lista "O que não é achado" ([revisão](referencias/revisao.md)). Não recebe a conversa.
 
 ### 5 · Decidir
 
-O orquestrador julga cada achado ([revisão](referencias/revisao.md)). Abre o `arquivo:linha` citado, dá veredito (confirmado, falso ou incerto), agrupa por causa e manda cada grupo para uma rota:
+Primeiro, `scripts/julgar-pre.sh <pasta> plano <relatórios>` numera, agrupa por lugar e devolve uma linha por achado; o detalhe fica em `achados.md`. O orquestrador julga cada achado ([revisão](referencias/revisao.md)). Abre o `arquivo:linha` citado, dá veredito (confirmado, falso ou incerto), agrupa por causa e manda cada grupo para uma rota:
 
 - `intencao`: lacuna de negócio ou de intenção. Vai para o usuário.
-- `plano`: o construtor revisa. É nova rodada, até 3.
+- `plano`: o construtor revisa. É nova rodada, até o teto do nível.
 - `ajuste`: correção pequena que não muda a intenção. O orquestrador faz.
 - `adiar`: vira item no registro de status do projeto (seção R do perfil). Não bloqueia, mas aparece na entrega.
 
@@ -103,7 +104,7 @@ Verificador ([papel](papeis/verificador.md)): outro agente que não o implementa
 
 ### 8 · Atacar o código
 
-Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`. O script inclui arquivo novo e deixa de fora o que outra sessão mexeu. Recalcule as lentes pelo diff real, porque ele pode tocar mais do que o plano previa; se nenhuma lente acionar, o adversário revisa o diff. Em N3, o adversário revisa sempre. O julgamento segue a etapa 5; correções voltam ao implementador, até 3 rodadas.
+Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`. O script inclui arquivo novo e deixa de fora o que outra sessão mexeu. Recalcule as lentes pelo diff real, porque ele pode tocar mais do que o plano previa. Em N1, um revisor. Em N2, o adversário revisa o diff em uma rodada; lente só entra com sinal novo no diff, que o plano não previa; achado do portão do plano é conferido pelo ID em uma linha (`A-3 → mitigado em arquivo:linha`), sem lente nova; e a 2ª rodada só abre por CRÍTICO confirmado. Em N3, lentes e adversário, até 3 rodadas. O julgamento segue a etapa 5 (`julgar-pre.sh <pasta> codigo`); correções voltam ao implementador.
 
 **Varredura de segurança (invasor).** Quando o usuário pedir uma varredura do sistema, e não de uma mudança só, ou quando a tarefa for de segurança em N3, o **invasor** ([papel](papeis/invasor.md)) ataca o código como quem quer invadir, vazar dado e derrubar o sistema, e devolve um relatório de conserto. Ataca o código, nunca o sistema no ar. O relatório passa por um revisor de segurança de contexto limpo, que confirma, refuta ou marca como incerto cada brecha. Só o confirmado vira conserto, pelo caminho normal: etapa 5 para julgar, 6 para construir, 7 e 8 para provar. Brecha que mexe em permissão, isolamento entre clientes, migration ou segredo passa pelo usuário antes do código, salvo quando ele já autorizou o fluxo de conserto. Categoria `forte` para o invasor e `padrao` para o revisor.
 
@@ -116,14 +117,13 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 
 ## Orquestrador enxuto
 
-- Lê perfil, registro e relatórios. Arquivo grande não é lido inteiro.
+- Lê perfil, registro e relatórios; arquivo grande não é lido inteiro. Não delega o que um comando resolve.
 - Confere prova por amostra: abre o `arquivo:linha` citado ou roda de novo o comando mais barato.
-- Não delega o que um comando resolve.
 - Cada subagente recebe o pacote de ida e nada mais. Pacote para modelo pequeno leva passos numerados.
 - Saída longa de comando passa por `scripts/enxugar.sh`; relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
-- Quando o harness informa os tokens gastos por subagente, anote no registro. Orçamento da triagem estourado: avise antes de continuar.
-- No Claude Code, rode `scripts/orcamento.sh --tarefa <pasta>` antes de cada leva ([harness](referencias/harness.md)). Com 70% da janela de 5 horas, só N0 e N1 seguem, com a Retomada gravada antes, e o nível não desce por isso; com 85%, parada limpa, com o caminho do `registro.md` para a sessão nova. Com `desligado`, `sem-dado` ou `ok` com o aviso de app desktop, diga uma vez que o orçamento vivo está sem dado confiável, com o motivo que a linha traz, e grave a Retomada antes de cada leva de N2 ou N3: nada avisa que a janela está acabando.
-- Contexto compactado, sessão retomada ou sessão nova depois de parada limpa: releia `registro.md` (seção Retomada) e siga.
+- Anote no registro os tokens de cada subagente (o Claude Code informa na notificação de fim) e, no fechamento, o total da tarefa com o da sessão do orquestrador. Orçamento da triagem estourado: avise antes de continuar.
+- Antes de cada leva, rode `scripts/orcamento-local.sh --tarefa <pasta>`, que lê os transcripts do Claude Code e funciona no terminal e no app desktop ([harness](referencias/harness.md)). `restrito` (70% da janela de 5 horas, estimado): só N0 e N1 seguem, e o nível não desce por isso. `parar` (85%, limite batido, ou contexto desta sessão em 70%): parada limpa. `desligado` ou `sem-dado`: diga uma vez o motivo que a linha traz e siga, com a Próxima ação gravada antes de cada leva.
+- Ao fechar cada etapa, `scripts/progresso.sh <pasta> marcar <n> feita <artefatos>` e o `contexto-tarefa.md` reescrito; antes de cada leva, só a Próxima ação dele. Parada limpa, sessão nova e volta de pausa: [retomada](referencias/retomada.md).
 
 ## Quando parar e perguntar
 
@@ -131,8 +131,7 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Premissa medida desmentiu o pedido.
 - Mudança de tela ou de fluxo, quando o projeto exige aprovação de design.
 - Risco que só o dono pode aceitar, como um inegociável do projeto.
-- Teto de rodadas atingido com achado CRÍTICO ou ALTO aberto.
-- Orçamento estourado.
+- Teto de rodadas atingido com achado CRÍTICO ou ALTO aberto, ou orçamento estourado.
 
 O subagente não fala com o usuário. Dúvida dele volta como `STATUS: bloqueado`, e quem pergunta é o orquestrador.
 
@@ -142,8 +141,8 @@ O subagente não fala com o usuário. Dúvida dele volta como `STATUS: bloqueado
 |---|---|---|
 | `script` | contar, listar, hash, diff, teste, lint, build | comando |
 | `rapido` | achar código, resumir arquivo, medir premissa | `haiku` |
-| `padrao` | implementar tarefa bem descrita, teste, lente em N2, verificação, perfil | `sonnet` |
-| `forte` | plano, adversário em N2, lente em N3, implementação delicada | `opus` |
+| `padrao` | implementar tarefa bem descrita, teste, plano, adversário e lentes em N2, verificação, perfil | `sonnet` |
+| `forte` | plano e lentes em N3, implementação delicada | `opus` |
 | `profundo` | adversário em N3, decisão de arquitetura, bug que resistiu a duas tentativas | `fable` |
 
 Escalada, modelo indisponível, independência e outros harnesses: [modelos](referencias/modelos.md) e [harness](referencias/harness.md). Categoria sem acesso na conta desce um nível, e isso é dito na entrega. Sem subagentes, use o modo sequencial descrito em harness.
@@ -159,6 +158,7 @@ Escalada, modelo indisponível, independência e outros harnesses: [modelos](ref
 | `referencias/revisao.md` | julgar achados, critério de parada |
 | `referencias/harness.md` | disparar subagentes neste harness |
 | `referencias/evolucao.md` | fechar a tarefa, registrar escape |
+| `referencias/retomada.md` | parada limpa, sessão nova, tarefa em curso |
 | `papeis/*.md`, `papeis/lentes/*.md` | colar no pacote do subagente (o `papeis/invasor.md` na varredura de segurança) |
-| `moldes/*.md` | perfil, plano e registro |
-| `scripts/*.sh` | impressão das fontes, pasta da tarefa, diff da tarefa, checagem da skill, orçamento vivo, saída enxuta |
+| `moldes/*.md` | perfil, plano, registro, progresso e contexto da tarefa |
+| `scripts/*.sh` | impressão das fontes, pasta da tarefa, progresso, fichas e trechos, pré-julgamento, diff da tarefa, checagem da skill, orçamento vivo, saída enxuta |

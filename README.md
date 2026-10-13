@@ -8,11 +8,12 @@ O nome vem da analogia: a seiva sobe pela árvore e toma a forma dela. A skill n
 
 - **Mede o risco antes de gastar.** Classifica a tarefa em quatro níveis. Correção trivial ela manda fazer direto. Permissão, dinheiro, migração, isolamento entre clientes e produção recebem o processo completo.
 - **Escolhe o modelo por tarefa.** Busca e leitura vão para o modelo rápido; implementação bem descrita, para o médio; plano e revisão de alto risco, para o mais forte. O que é mecânico vira comando, sem modelo.
-- **Ataca o plano antes do código.** Um adversário faz o pre-mortem ("isto já quebrou; por quê?"), e as lentes (segurança, dados, design, desempenho, operação, contrato) respondem às perguntas da área delas. Achado só conta com prova.
-- **Julga os achados e para na hora certa.** O orquestrador confere cada achado, agrupa por causa e decide a rota: pergunta ao usuário, revisão do plano, ajuste ou registro. No máximo três rodadas por portão.
+- **Ataca o plano antes do código.** Um adversário faz o pre-mortem ("isto já quebrou; por quê?"), e as lentes (segurança, dados, design, desempenho, operação, contrato) respondem às perguntas da área delas. Achado só conta com prova. Os revisores leem fichas e trechos do código gerados por script, não arquivos inteiros.
+- **Julga os achados e para na hora certa.** Um script numera e agrupa os achados, e o orquestrador confere cada um, agrupa por causa e decide a rota: pergunta ao usuário, revisão do plano, ajuste ou registro. Até duas rodadas por portão em risco médio e três em risco alto.
 - **Verifica com outro agente.** Quem implementa não é quem prova. O verificador roda os comandos do projeto e confere cada critério de aceite e cada risco do plano.
 - **Aprende com o que escapa.** Defeito encontrado depois da entrega vira proposta de pergunta nova numa lente. Nada muda sem aprovação.
-- **Vigia a janela de uso (Claude Code).** Com a statusline opcional, confere o uso da janela de 5 horas antes de cada leva de agentes: perto do limite, segura as tarefas grandes e para limpo, com o ponto de retomada gravado, em vez de estourar no meio.
+- **Vigia a janela de uso e o contexto (Claude Code, no terminal e no app desktop).** Antes de cada leva de agentes, lê os transcripts locais e estima o uso da janela de 5 horas e o tamanho do contexto da sessão. Perto do limite, segura as tarefas grandes e para limpo, com o ponto de retomada gravado, em vez de estourar no meio. A estimativa se calibra sozinha pelas vezes em que a conta bateu no limite; é freio, não medidor oficial.
+- **Retoma sem pagar de novo.** O estado da tarefa fica em dois arquivos curtos. Uma sessão nova retoma lendo perto de mil tokens e não refaz etapa feita.
 
 ## O que ela não faz
 
@@ -20,7 +21,7 @@ O nome vem da analogia: a seiva sobe pela árvore e toma a forma dela. A skill n
 - Não substitui as regras do projeto. Quando as duas divergem, vale a do projeto.
 - Não commita nem sobe nada se o projeto não permitir.
 - Não diz que a revisão foi independente quando não foi.
-- A statusline do orçamento vivo é opcional, e quem instala é você. A seiva só fornece o script e o bloco de instalação. Ela só roda no `claude` de terminal: o app desktop não a chama. No app, o orçamento vivo fica desligado. A exceção é o dado que uma sessão do terminal gravou antes: ele vale como piso, mas não se atualiza.
+- O orçamento vivo não precisa de statusline nem de hook. A statusline continua opcional, quem instala é você, e ela só roda no `claude` de terminal: quando está lá, o número oficial dela substitui a estimativa.
 
 ## Instalação
 
@@ -53,7 +54,7 @@ Na primeira vez num projeto, a seiva monta um perfil com as regras que encontrou
 
 ## Custo
 
-Um enxame gasta muito mais tokens que uma conversa: a Anthropic mediu cerca de 15 vezes. Por isso a seiva começa pela triagem. Tarefa trivial não dispara agente; tarefa leve usa de 1 a 3; só as de risco alto recebem o processo inteiro. O orçamento de agentes de cada tarefa aparece antes de começar, e os tokens gastos ficam anotados quando o harness informa.
+Um enxame gasta muito mais tokens que uma conversa: a Anthropic mediu cerca de 15 vezes. Por isso a seiva começa pela triagem. Tarefa trivial não dispara agente; tarefa leve usa de 1 a 3; só as de risco alto recebem o processo inteiro. O orçamento de agentes de cada tarefa aparece antes de começar, e os tokens gastos, dos subagentes e da sessão principal, ficam anotados contra esse orçamento. Em risco médio, plano e revisão usam o modelo médio, e o código é revisado uma vez, pelo adversário, a não ser que apareça superfície nova.
 
 Se a conta não tiver acesso ao modelo mais caro, a seiva desce para o de baixo, segue e diz isso na entrega.
 

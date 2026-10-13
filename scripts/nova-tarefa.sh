@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cria a pasta de uma tarefa com registro, plano e achados a partir dos moldes da skill,
+# Cria a pasta de uma tarefa com registro, plano, achados, progresso e contexto a partir dos moldes da skill,
 # e grava no registro a foto do `git status` de agora: o que já estava mexido antes da
 # tarefa começar é de outra sessão, não desta.
 #
@@ -34,6 +34,8 @@ fi
 mkdir -p "$destino/relatorios"
 sed -e "s/{{DATA}}/$dia/g" -e "s/{{SLUG}}/$slug/g" "$skill/moldes/registro.md" > "$destino/registro.md"
 sed -e "s/{{SLUG}}/$slug/g" "$skill/moldes/plano.md" > "$destino/plano.md"
+sed -e "s/{{SLUG}}/$dia-$slug/g" "$skill/moldes/progresso.md" > "$destino/progresso.md"
+sed -e "s/{{SLUG}}/$dia-$slug/g" "$skill/moldes/contexto-tarefa.md" > "$destino/contexto-tarefa.md"
 printf '# Achados — %s\n' "$slug" > "$destino/achados.md"
 
 {

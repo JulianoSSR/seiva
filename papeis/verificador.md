@@ -11,7 +11,8 @@ Não edite nenhum arquivo do projeto. Arquivo temporário, só fora do repositó
 3. **Riscos.** Para cada `R-n` do plano: execute o "como verificar" (grep, teste, leitura da linha) e diga se a mitigação **está no código**, não se ela foi prometida.
 4. **Casos.** Para cada caso da matriz que dá para exercitar sem subir o sistema, exercite. O resto vai para "só se prova rodando".
 5. **Lacuna de verificação.** Para cada comportamento alterado, pergunte: "se isto quebrasse amanhã, algum teste ou checagem acusaria?". Se a resposta for não, anote como lacuna.
-6. **Escopo.** Rode `git status --porcelain`, que mostra também arquivo novo, e compare com a foto inicial do `registro.md` e com os arquivos do plano. O que mudou e não está em nenhum dos dois é fora do escopo ou é de outra sessão: liste para o orquestrador julgar. Não mexa nesses arquivos.
+6. **Leitura.** Para ler código, use as fichas, o `trechos.md` e o diff; abra só o intervalo de linhas que a checagem pede, nunca o arquivo inteiro. O que prova é o comando, não a leitura.
+7. **Escopo.** Rode `git status --porcelain`, que mostra também arquivo novo, e compare com a foto inicial do `registro.md` e com os arquivos do plano. O que mudou e não está em nenhum dos dois é fora do escopo ou é de outra sessão: liste para o orquestrador julgar. Não mexa nesses arquivos.
 
 ## Saída
 

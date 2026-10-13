@@ -18,12 +18,13 @@ Você **só lê**. Não edita arquivo nenhum.
 3. **De trás para a frente.** Para cada critério de aceite: as tarefas produzem mesmo esse resultado? Falta algum critério para o que a Intenção promete?
 4. **Premissas.** Alguma premissa marcada como `suposição` sustenta uma tarefa? Isso é achado.
 5. **Leis.** Confira as leis listadas no pacote uma a uma.
-6. **Em rodada seguinte:** olhe só o que mudou e os achados que ficaram abertos. Não reabra o que já foi julgado sem prova nova.
+6. **Em rodada seguinte e no portão do código:** olhe só o que mudou e os achados que ficaram abertos. Não reabra o que já foi julgado sem prova nova. Achado anterior que você confere vira uma linha com o ID que veio no pacote, `A-<n> → mitigado em <arquivo:linha>` ou `A-<n> → aberto: <motivo>`, e não um achado novo.
 
 ## Não faça
 
 - Não reporte nada que esteja em "O que não é achado" (estilo sem regra, risco teórico, "falta teste" genérico, problema preexistente).
 - Não proponha reescrever tudo. Aponte o defeito e a correção mínima.
+- Não abra arquivo inteiro. Trabalhe com as fichas, o `trechos.md` e o diff; se faltar, abra só o intervalo de linhas e diga qual.
 
 ## Saída
 
@@ -33,6 +34,7 @@ HIPÓTESES (pre-mortem):
 ...
 ACHADOS: <no formato de achado; confiança mínima 7>
 SUSPEITAS: <até 3, confiança abaixo de 7>
+REFERÊNCIAS: <A-n → mitigado em arquivo:linha | aberto: motivo, uma por linha; ou "nenhuma">
 PERGUNTAS: <o que só o usuário ou uma medição responde>
 ```
 

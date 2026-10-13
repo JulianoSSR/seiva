@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Lê o orçamento gravado pela statusline (scripts/statusline-orcamento.sh) e diz se a seiva pode abrir outra leva de agentes.
-# Só vale no Claude Code, com a statusline instalada pelo usuário. Sem o arquivo, o estado é "desligado" e a seiva segue como sempre.
+# Lê um arquivo de orçamento e diz se a seiva pode abrir outra leva de agentes. É o único que decide o estado.
+# Quem grava o arquivo: o scripts/orcamento-local.sh (pelos transcripts, no terminal e no app desktop; é o caminho
+# normal, e ele chama este leitor) ou a statusline (scripts/statusline-orcamento.sh, só no terminal, instalada pelo usuário).
+# Sem arquivo, o estado é "desligado" e a seiva segue como sempre.
 #
 # Uso: orcamento.sh [--tarefa <pasta-da-tarefa>] [arquivo]
-#   arquivo  padrão: ${XDG_CACHE_HOME:-$HOME/.cache}/seiva/orcamento.json
+#   arquivo  padrão: ${XDG_CACHE_HOME:-$HOME/.cache}/seiva/orcamento.json (o da statusline)
 #   --tarefa grava o caminho absoluto de <pasta-da-tarefa>/registro.md no arquivo "retomar", ao lado do orçamento, para
 #            a barra dizer qual tarefa retomar. Só grava se a pasta do orçamento já existe (quem a cria é a statusline)
 #            e se o registro.md existe; senão não grava e diz por quê no fim da linha.
@@ -16,8 +18,12 @@
 #   sem-dado   já passou da hora em que a janela de 5h reinicia                                0
 #   ok         abaixo de 70                                                                     0
 #   restrito   70 ou mais                                                                      10
-#   parar      85 ou mais                                                                      20
+#   parar      85 ou mais, ou contexto desta sessão em 70% ou mais (só com contexto.desta_sessao) 20
 #   Uso errado sai com 2.
+#
+# Campos opcionais (o orcamento-local.sh grava; a statusline não): "fonte" ("jsonl" desliga os avisos de statusline e
+# de app desktop, porque o dado foi medido agora); "cinco_horas.motivo" (o motivo quando não há percentual);
+# "contexto.desta_sessao" (true quando o contexto é o desta sessão, o que liga a parada por contexto).
 #
 # O percentual gravado vale como piso até a janela reiniciar (o uso só cresce dentro dela). A idade vem de
 # cinco_horas.visto_em: a barra pode estar uma mensagem atrás. Avisos: "statusline desatualizada" quando a cópia
@@ -63,6 +69,7 @@ desktop=0
 estado=desligado
 detalhe=""
 script=""
+fonte=statusline
 if ! command -v jq >/dev/null 2>&1; then
   detalhe="jq não está instalado"
 elif [ -z "$arquivo" ] || [ ! -r "$arquivo" ]; then
@@ -78,26 +85,33 @@ elif lido=$(jq -r '
   def hora: if . == null then "--:--" else strflocaltime("%H:%M") end;
   def valida($agora): .usado != null and (.reinicia == null or .reinicia > $agora);
   (now | floor) as $agora
-  | if .versao != 1 then ["desligado", "o arquivo de orçamento é de outra versão do formato", ""]
+  | (.fonte // "statusline" | if type == "string" then gsub("[^a-z]"; "") else "statusline" end) as $fonte
+  | if .versao != 1 then ["desligado", "o arquivo de orçamento é de outra versão do formato", "", $fonte]
     else
       (.cinco_horas | janela) as $c5
+      | (.cinco_horas | if type == "object" and (.motivo | type) == "string" then .motivo | gsub("[\n\r]"; " ") else null end) as $motivo
       | (.sete_dias | janela) as $d7
-      | (.contexto | if type == "object" then {usado: (.usado | num), sessao: (.sessao // "" | tostring)} else {usado: null, sessao: ""} end) as $cx
+      | (.contexto | if type == "object" then {usado: (.usado | num), sessao: (.sessao // "" | tostring), desta: (.desta_sessao == true)} else {usado: null, sessao: "", desta: false} end) as $cx
       | ($cx.sessao | gsub("[^A-Za-z0-9._-]"; "") | .[0:8]) as $sid
       | (.script // "" | if type == "string" then gsub("[\n\r]"; "") else "" end) as $script
       | ($c5.visto_em | if . == null then "dado de idade desconhecida" else "dado de \((($agora - .) / 60 | floor) | if . < 0 then 0 else . end) min" end) as $idade
-      | if $c5.usado == null then ["desligado", "o arquivo não traz o percentual da janela de 5 horas (plano sem esse dado, ou a sessão ainda não recebeu resposta)", $script]
+      | if $c5.usado == null then ["desligado", ($motivo // "o arquivo não traz o percentual da janela de 5 horas (plano sem esse dado, ou a sessão ainda não recebeu resposta)") + (if $cx.usado == null then "" else " · ctx \($cx.usado | pct) (sessão \($sid))" end), $script]
         elif ($c5.reinicia != null and $agora >= $c5.reinicia) then
-          ["sem-dado", "a janela de 5h reiniciou às \($c5.reinicia | hora); o percentual gravado é da janela anterior · \($idade)", $script]
+          ["sem-dado", "a janela de 5h reiniciou às \($c5.reinicia | hora); o percentual gravado é da janela anterior\(if $cx.usado == null then "" else " · ctx \($cx.usado | pct) (sessão \($sid))" end) · \($idade)", $script]
         else
           [(if $c5.usado >= 85 then "parar" elif $c5.usado >= 70 then "restrito" else "ok" end),
            "5h \($c5.usado | pct) até \($c5.reinicia | hora) · 7d \(if ($d7 | valida($agora)) then ($d7.usado | pct) else "--" end) · ctx \($cx.usado | pct) (sessão \($sid)) · \($idade)",
            $script]
         end
+      # Contexto desta sessão em 70% ou mais: parada limpa antes da compactação automática, com sessão nova já.
+      | if $cx.desta and $cx.usado != null and $cx.usado >= 70 then
+          ["parar", "contexto desta sessão em \($cx.usado | pct) (o limite é 70%): parada limpa, e a sessão nova pode começar agora · \(.[1])", .[2]]
+        else . end
+      | . + [$fonte]
     end
   | .[]
 ' "$arquivo" 2>/dev/null); then
-  { IFS= read -r estado; IFS= read -r detalhe; IFS= read -r script; } <<< "$lido"
+  { IFS= read -r estado; IFS= read -r detalhe; IFS= read -r script; IFS= read -r fonte; } <<< "$lido"
 else
   detalhe="o arquivo de orçamento não é um JSON válido"
 fi
@@ -105,7 +119,8 @@ fi
 avisos=""
 
 # A cópia instalada da statusline acompanha a do repositório? (só informa; quem atualiza é o usuário)
-if [ "$estado" != desligado ]; then
+# Com fonte "jsonl" o dado foi medido agora pelos transcripts: nem a statusline nem o app desktop pesam nele.
+if [ "$estado" != desligado ] && [ "$fonte" != jsonl ]; then
   if [ -n "$script" ] && [ -f "$script" ] && [ -r "$script" ] && [ -r "$aqui/statusline-orcamento.sh" ]; then
     cmp -s "$script" "$aqui/statusline-orcamento.sh"
     [ "$?" -eq 1 ] && avisos+=" · statusline desatualizada: rode a linha de atualização do harness.md"

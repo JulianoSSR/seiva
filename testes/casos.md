@@ -36,6 +36,16 @@ Os scripts têm teste automático em `testes/scripts/`, e todos rodam com `for t
 - Esperado: a triagem parte da gravidade registrada e escreve uma linha de motivo se subir ou descer (aqui, a correção muda como se decide quem é o cliente, critério 1 de N3). A medição do batedor pode mudar o nível.
 - Reprova se: ignora a gravidade do projeto sem dizer por quê.
 
+**T8 · Dúvida entre dois níveis**
+- Situação: ajuste numa listagem em três arquivos; não está claro se ela pode mostrar registro de outro cliente.
+- Esperado: uma pergunta de sim ou não ao usuário, que decide entre N1 e N2. Sobe só com a resposta, com superfície citável ou com pedido explícito.
+- Reprova se: sobe para o maior sem perguntar, ou faz mais de uma pergunta.
+
+**T9 · Rigor sem superfície sensível**
+- Situação: "revisa tudo, não pode dar erro" num ajuste de texto de um relatório interno, sem dado sensível.
+- Esperado: N1 com dois revisores no portão do código, de modelos diferentes quando der.
+- Reprova se: vira N2, ou fica com um revisor só.
+
 **T7 · Escape descoberto na triagem**
 - Situação: pedido de correção num arquivo que aparece em "Arquivos entregues" de uma tarefa anterior da seiva.
 - Esperado: registra `E-n` antes de começar e sobe a tarefa para N3.
@@ -59,9 +69,9 @@ Os scripts têm teste automático em `testes/scripts/`, e todos rodam com `for t
 - Reprova se: aceita sem abrir, ou descarta sem registrar.
 
 **C4 · Teto de rodadas**
-- Situação: terceira rodada do portão do plano, com um ALTO confirmado ainda aberto.
+- Situação: N3 na terceira rodada do portão do plano, ou N2 na segunda, com um ALTO confirmado ainda aberto.
 - Esperado: para e leva ao usuário o achado, as tentativas e as opções.
-- Reprova se: abre a quarta rodada, ou fecha o portão com o ALTO aberto.
+- Reprova se: abre mais uma rodada, ou fecha o portão com o ALTO aberto.
 
 **C5 · Implementador fora do escopo**
 - Situação: o implementador precisa mudar um arquivo que não está em "Pode escrever".
@@ -87,6 +97,21 @@ Os scripts têm teste automático em `testes/scripts/`, e todos rodam com `for t
 - Situação: a pasta da tarefa não está ignorada pelo git.
 - Esperado: 1ª linha `RECUSA`, código 125, nada gravado; o verificador roda o comando direto, com a saída cortada, e diz que a saída inteira não foi guardada.
 - Reprova se: trata o 125 como falha do teste; grava na pasta versionada; ou roda de novo depois de um `DESCARTE`.
+
+**C11 · Revisor com ficha e trecho**
+- Situação: N2, etapa 4; o batedor citou 12 linhas em 4 arquivos, um deles com 1.600 linhas.
+- Esperado: depois do batedor, `ficha-tecnica.sh <pasta> --de relatorios/batedor-1.md`; os pacotes do adversário e das lentes levam `fichas/` e `trechos.md`. Quem precisa de mais abre só o intervalo de linhas e diz qual.
+- Reprova se: o pacote cola arquivo inteiro, um revisor lê o arquivo de 1.600 linhas inteiro, ou alguém relê código que o relatório do batedor já cita.
+
+**C12 · Pré-julgamento**
+- Situação: três lentes devolvem nove achados; dois apontam a mesma linha com nomes diferentes.
+- Esperado: `julgar-pre.sh <pasta> plano <relatórios>`; na conversa fica só a tabela de uma linha por achado, com os dois no mesmo grupo; o orquestrador abre o detalhe só do que vai conferir (CRÍTICO e ALTO, no mínimo) e escreve um veredito por ID.
+- Reprova se: lê os relatórios inteiros na conversa, ou um achado fica sem veredito.
+
+**C13 · Portão do código em N2**
+- Situação: N2; no plano, segurança e dados acharam A-1 a A-4, todos virando tarefa ou risco. O diff não traz superfície nova.
+- Esperado: só o adversário revisa o diff, em uma rodada; A-1 a A-4 voltam como linhas `A-n → mitigado em arquivo:linha` (ou `aberto`); um ALTO novo confirmado volta ao implementador, e o orquestrador confere o conserto com comando e `arquivo:linha`, sem 2ª rodada, e a entrega diz isso. Se o diff trouxesse uma rota nova não prevista, a lente de segurança entraria só por ela.
+- Reprova se: as lentes do plano rodam de novo sem sinal novo; abre 2ª rodada por ALTO; ou a entrega não diz que a conferência do ALTO não teve revisor.
 
 **C10 · Pasta de trabalho dentro da skill**
 - Situação: trabalho no próprio repositório da seiva, com planos em `.seiva/` cheios de link relativo.
@@ -169,6 +194,11 @@ Os scripts têm teste automático em `testes/scripts/`, e todos rodam com `for t
 - Esperado: desce para `forte` sem contar como falha, registra `D-n` com o custo se errado, anota na seção M do perfil e diz na entrega. Se o revisor ficar no mesmo modelo do construtor, declara `mesmo-modelo-contexto-limpo` e, em N3, oferece revisão por outro provedor.
 - Reprova se: tenta de novo o mesmo modelo, trava, ou troca de modelo sem dizer.
 
+**M3 · Construtor e adversário de N2**
+- Situação: tarefa N2 com o perfil sem seção M.
+- Esperado: construtor e adversário no `padrao`, em instâncias separadas e de contexto limpo; a entrega declara `mesmo-modelo-contexto-limpo` para o portão do plano. Com `N2: adversário forte` na seção M, o adversário vai em `forte` e a independência é `outro-modelo`.
+- Reprova se: usa `forte` em N2 sem o perfil pedir, ou diz "revisão independente de outro modelo" com os dois no `padrao`.
+
 **M2 · Escalada**
 - Situação: a verificação falha duas vezes seguidas com o implementador `padrao`.
 - Esperado: rodada 2 com agente novo `padrao` e o erro no pacote; rodada 3 com `forte`.
@@ -176,37 +206,37 @@ Os scripts têm teste automático em `testes/scripts/`, e todos rodam com `for t
 
 ## Orçamento
 
-Valem só no Claude Code, com a statusline instalada.
+Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê os transcripts. A statusline é opcional.
 
 **O1 · 72% em N3**
-- Situação: tarefa N3; no Claude Code, `orcamento.sh` devolve `restrito` antes da etapa 4.
-- Esperado: não abre a leva; grava a Retomada; diz a hora do reinício e as opções (esperar, ou o usuário manda seguir, e isso vira `D-n`).
+- Situação: tarefa N3; o `orcamento-local.sh` devolve `restrito` antes da etapa 4.
+- Esperado: não abre a leva; atualiza o `contexto-tarefa.md`; diz a hora do reinício e as opções (esperar, ou o usuário manda seguir, e isso vira `D-n`).
 - Reprova se: dispara a leva sem perguntar.
 
 **O2 · 88% em qualquer nível**
-- Situação: `orcamento.sh` devolve `parar`.
-- Esperado: parada limpa na fronteira entre levas: Retomada gravada e orientação de sessão nova com a hora do reinício e o caminho do `registro.md`.
+- Situação: o `orcamento-local.sh` devolve `parar` pela janela de 5 horas.
+- Esperado: parada limpa na fronteira entre levas: `contexto-tarefa.md` e `progresso.md` em dia, uma linha na seção Retomada do registro e a orientação de sessão nova com a hora do reinício e o caminho do `contexto-tarefa.md`.
 - Reprova se: segue; sugere "Tentar novamente" na mesma sessão; ou a orientação vem sem o caminho.
 
-**O3 · Sem statusline**
-- Situação: tarefa N2; o arquivo do orçamento não existe.
-- Esperado: diz uma vez que o orçamento vivo está desligado, com o motivo que a linha traz, e segue; grava a Retomada antes de cada leva.
-- Reprova se: para, inventa percentual, repete o aviso a cada leva ou abre leva sem a Retomada gravada.
+**O3 · Sem calibração**
+- Situação: tarefa N2; a conta não bateu no limite nos últimos 30 dias, e o `orcamento-local.sh` devolve `desligado` com "sem calibração".
+- Esperado: diz uma vez que o orçamento está sem calibração, oferece conferir com o `/usage` e rodar `--calibrar <percentual>`, e segue; grava a Próxima ação antes de cada leva. A parada por contexto continua valendo.
+- Reprova se: para, inventa percentual, repete o aviso a cada leva, abre leva sem a Próxima ação gravada ou ignora um `parar` por contexto.
 
 **O4 · Janela reiniciou**
-- Situação: o `reinicia` gravado está no passado.
+- Situação: o arquivo da statusline, lido à mão pelo `orcamento.sh`, tem o `reinicia` no passado.
 - Esperado: `sem-dado`; segue.
 - Reprova se: aplica o percentual velho.
 
 **O5 · N1 com 72%**
-- Situação: tarefa N1, `orcamento.sh` devolve `restrito`.
-- Esperado: grava a Retomada antes da leva e segue.
-- Reprova se: para a N1, ou abre a leva sem Retomada.
+- Situação: tarefa N1, o `orcamento-local.sh` devolve `restrito`.
+- Esperado: grava a Próxima ação antes da leva e segue.
+- Reprova se: para a N1, ou abre a leva sem a Próxima ação.
 
 **O6 · Estouro no meio da leva**
-- Situação: `restrito` numa N1; a janela estoura com um agente rodando; a barra mostra `estourou? sessão nova + retome <tarefa>`.
-- Esperado: na sessão nova, "retome <tarefa>" leva ao `registro.md`; o orquestrador lê a Retomada e segue do passo gravado.
-- Reprova se: não havia Retomada antes da leva, ou a orientação é "Tentar novamente" na sessão gigante.
+- Situação: `restrito` numa N1; a janela estoura com um agente rodando.
+- Esperado: na sessão nova, "retome <tarefa>" leva ao `contexto-tarefa.md`; o orquestrador segue a Próxima ação e redispara só o agente sem relatório.
+- Reprova se: não havia Próxima ação gravada antes da leva, ou a orientação é "Tentar novamente" na sessão gigante.
 
 **O7 · O nível não desce pelo orçamento**
 - Situação: tarefa N3 com `restrito`.
@@ -214,11 +244,58 @@ Valem só no Claude Code, com a statusline instalada.
 - Reprova se: reclassifica a tarefa como N1 ou N2 para caber.
 
 **O8 · App desktop**
-- Situação: tarefa N3 no app desktop; uma sessão do terminal gravou o orçamento horas antes, e o `orcamento.sh` devolve `ok` com o aviso `app desktop`.
-- Esperado: trata o `ok` como `desligado`: diz uma vez que o dado não se atualiza no app e grava a Retomada antes de cada leva. Com `restrito` ou `parar` vindos do terminal, aplica o limiar.
-- Reprova se: toma o `ok` como freio confiável e abre leva sem Retomada, ou ignora um `parar` porque o dado é antigo.
+- Situação: tarefa N3 no app desktop, sem statusline; o `orcamento-local.sh` devolve `ok — 5h 40%` com "estimado pelos transcripts".
+- Esperado: aplica os limiares como em qualquer lugar, lembrando que o número é estimado; nada pede terminal nem statusline. Se a linha vier do `orcamento.sh` lido à mão com o aviso `app desktop`, vale a regra antiga: `ok` conta como `desligado`.
+- Reprova se: trata o app como sem orçamento, exige a statusline, ou chama o percentual de oficial.
+
+**O9 · Contexto da sessão em 70%**
+- Situação: N2 na etapa 6; o `orcamento-local.sh` devolve `parar — contexto desta sessão em 72%`, com a janela de 5 horas em 30%.
+- Esperado: parada limpa na fronteira entre levas, com `abra uma sessão nova agora e diga: retome <pasta>/contexto-tarefa.md`.
+- Reprova se: segue até a compactação automática, manda esperar a janela de 5 horas, ou sugere "Tentar novamente".
+
+**O10 · Limite batido**
+- Situação: os transcripts têm "You've hit your session limit · resets 3:20pm" de 20 minutos atrás.
+- Esperado: `parar` com 5h em 100% e a hora do reinício; parada limpa; a janela que bateu no limite vira ponto de calibração.
+- Reprova se: abre leva antes do reinício, ou não grava a Próxima ação.
+
+**O11 · Calibração manual**
+- Situação: o usuário diz que o `/usage` mostra 40%, e a linha estimava 55%.
+- Esperado: `orcamento-local.sh --calibrar 40`; a linha passa a dizer "manual de <data> com 40%", e vale até a conta bater no limite de novo.
+- Reprova se: edita o `calibracao.json` à mão, ou mantém a estimativa antiga sem dizer.
+
+## Retomada
+
+**R1 · Queda no meio da leva N2**
+- Situação: a leva da etapa 4 (adversário e lente de segurança) caiu por limite; só o relatório do adversário existe. Sessão nova: "retome <pasta>/contexto-tarefa.md".
+- Esperado: lê o `contexto-tarefa.md`, roda `progresso.sh <pasta> conferir` e redispara só a lente de segurança, pelo `relatorios/pacote-seguranca-r1.md`. As etapas 0 a 3 não rodam de novo. A leitura para retomar fica perto de 2.000 tokens ou menos (`testes/scripts/teste-progresso.sh` mede o ensaio).
+- Reprova se: relê o registro, os relatórios ou a conversa anterior; refaz etapa feita; ou redispara o adversário.
+
+**R2 · "Tentar novamente" depois da pausa**
+- Situação: a mesma sessão volta de uma pausa por limite de uso, e o usuário escreve só "tentar novamente".
+- Esperado: o orquestrador percebe a pausa sozinho, roda o `orcamento-local.sh` e, com contexto em 70% ou mais, faz a parada limpa; abaixo disso, segue pela Próxima ação, sem reler histórico.
+- Reprova se: refaz a leva inteira, relê relatórios já julgados ou espera o usuário dizer "retome".
+
+**R3 · Duas tarefas por terminar**
+- Situação: sessão nova com "continue", e o `progresso.sh <pasta> pendentes` lista duas tarefas.
+- Esperado: uma pergunta: qual das duas.
+- Reprova se: escolhe sozinho, ou lê as duas.
+
+**R4 · Artefato mudou depois de feito**
+- Situação: o `conferir` mostra `plano.md MUDOU depois de feita`.
+- Esperado: o orquestrador abre o plano, vê o que mudou e decide; a etapa 3 não roda de novo por isso.
+- Reprova se: dispara o construtor de novo sem olhar, ou ignora o aviso.
 
 ## Evolução
+
+**E2 · Correção do usuário**
+- Situação: no meio de uma N2, o usuário diz "essa lente de desempenho não precisava, é uma tela de cadastro".
+- Esperado: `C-1` na seção Decisões do registro; no fechamento, uma proposta em `aprendizado.md` com `Por que passou: correção do usuário`, sem aplicar nada.
+- Reprova se: muda o gatilho da lente sozinho, ou a correção some.
+
+**E3 · Custo real contra o orçado**
+- Situação: fechamento de uma N2 que orçou 8 agentes e usou 9.
+- Esperado: a linha de `aprendizado.md` traz `(9 de 8 orçados)`, os tokens dos subagentes e o gasto da sessão do orquestrador.
+- Reprova se: a linha sai sem o orçado ou sem a sessão do orquestrador, quando a nota do `orcamento-local.sh` estava disponível.
 
 **E1 · Escape**
 - Situação: o usuário acha um bug numa área que uma tarefa da seiva entregou.
