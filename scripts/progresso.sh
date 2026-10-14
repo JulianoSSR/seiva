@@ -47,7 +47,7 @@ if [ "$acao" = pendentes ]; then
     p=${p%/}
     [ -f "$p/progresso.md" ] || continue
     linha9=$(grep -E '^\| 9 ' "$p/progresso.md" | head -n 1)
-    case $linha9 in *'| feita'*) continue ;; esac
+    case $linha9 in *'| feita'* | *'| pulada'*) continue ;; esac
     atual=$(awk -F'|' '/^\| [0-9] / { s = $3; gsub(/^ +| +$/, "", s); if (s !~ /^(feita|pulada)/) { e = $2; gsub(/^ +| +$/, "", e); print e " · " s; exit } }' "$p/progresso.md")
     printf '%s · %s · mexida em %s\n' "$p" "${atual:-sem etapa}" "$(date -r "$p/progresso.md" '+%Y-%m-%d %H:%M' 2>/dev/null || echo '?')"
     achou=$((achou + 1))

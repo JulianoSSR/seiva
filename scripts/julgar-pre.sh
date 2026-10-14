@@ -3,6 +3,8 @@
 #
 # Uso: julgar-pre.sh <pasta-da-tarefa> <plano|codigo> [--rodada <n>] <relatorio...>
 #   Lê os achados no formato de referencias/contratos.md ([A-n] SEVERIDADE · lente · confiança c / Onde: / Defeito:),
+#   com tolerância: severidade em qualquer caixa, prefixo antes do [A-n] ("1)", "Achado", negrito, crase). O que não
+#   fecha (cabeçalho sem severidade, bloco sem Onde nem Defeito, Onde sem cabeçalho) não conta e sai listado, com a linha.
 #   dá a cada um um ID da tarefa (continua do maior A-n de achados.md, para o ID ficar estável entre rodadas e portões),
 #   agrupa os que apontam o mesmo arquivo a até 3 linhas de distância, ou a mesma seção do plano, e acrescenta em
 #   achados.md uma seção "Rodada <n> · <portão>" com uma linha por achado e a origem (relatório:linha e ID local).
@@ -15,6 +17,16 @@
 # Não julga: agrupar por causa e dar veredito continua sendo do orquestrador. Uso errado sai com 2.
 set -uo pipefail
 export LC_ALL=C
+umask 077
+
+# Máscara de segredo na saída e no achados.md, quando o segredos.sh e o sed GNU estão aqui; sem eles, a linha diz.
+mascara=0
+case $0 in */*) aqui=${0%/*} ;; *) aqui=. ;; esac
+if [ -r "$aqui/segredos.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$aqui/segredos.sh"
+  [ "$(printf 'x\n' | mascarar 2>/dev/null)" = x ] && mascara=1
+fi
 
 uso() { echo "uso: julgar-pre.sh <pasta-da-tarefa> <plano|codigo> [--rodada <n>] <relatorio...>" >&2; exit 2; }
 [ "$#" -ge 3 ] || uso
@@ -38,7 +50,7 @@ hash12() { (sha256sum <"$1" 2>/dev/null || shasum -a 256 <"$1") | cut -c1-12; }
 rel() { case $1 in "$pasta"/*) printf '%s\n' "${1#"$pasta"/}" ;; *) printf '%s\n' "$1" ;; esac; }
 
 tmp=$(mktemp) || exit 2
-trap 'rm -f "$tmp" "$tmp.ref" "$tmp.ord"' EXIT
+trap 'rm -f "$tmp" "$tmp.ref" "$tmp.ord" "$tmp.sem" "$tmp.r2" "$tmp.m" "$tmp.x" "$tmp.ref.m" "$tmp.ref.x"' EXIT
 : >"$tmp.ref"
 lidos=""
 pulados=""
@@ -54,24 +66,50 @@ for r in "$@"; do
   # Um achado por bloco: cabeçalho [A-n] SEVERIDADE, depois Onde e Defeito. Saída em TSV.
   awk -v src="$nome" '
     function limpa(s) { gsub(/\t/, " ", s); gsub(/^[[:space:]*_`-]+|[[:space:]*_`]+$/, "", s); return s }
+    # Bloco sem Onde nem Defeito não é achado (em geral, uma hipótese que cita o [A-n]): vai para o aviso, não some.
     function sai() {
-      if (sev != "") printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", src, lid, sev, lente, conf, (onde == "" ? "?" : onde), (defeito == "" ? "?" : defeito), lin
+      if (sev != "") {
+        if (onde == "" && defeito == "") print "SEM\t" src ":" lin " [" lid "] (cabeçalho sem Onde nem Defeito)" > "/dev/stderr"
+        else printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", src, lid, sev, lente, conf, (onde == "" ? "?" : onde), (defeito == "" ? "?" : defeito), lin
+      }
       sev = ""
     }
-    /\[A-[0-9]+\]/ && /(CR(I|Í)TICO|ALTO|M(E|É)DIO|BAIXO)/ {
-      sai()
-      match($0, /\[A-[0-9]+\]/); lid = substr($0, RSTART + 1, RLENGTH - 2)
-      resto = substr($0, RSTART + RLENGTH)
-      if (resto ~ /CR(I|Í)TICO/) sev = "CRÍTICO"; else if (resto ~ /ALTO/) sev = "ALTO"
-      else if (resto ~ /M(E|É)DIO/) sev = "MÉDIO"; else sev = "BAIXO"
-      n = split(resto, p, "·"); lente = (n >= 2 ? limpa(p[2]) : "?")
-      conf = "?"; if (match(resto, /confian(c|ç)a[[:space:]]*[0-9]+/)) { c = substr(resto, RSTART, RLENGTH); gsub(/[^0-9]/, "", c); conf = c }
-      onde = ""; defeito = ""; lin = FNR
-      next
+    # Severidade logo depois do [A-n], em qualquer caixa e com ou sem acento (o locale é C: tolower só baixa o ASCII).
+    function sevde(s,   l) {
+      sub(/^[^A-Za-z]*/, "", s); l = tolower(s)
+      if (l ~ /^cr(i|í|Í)tico/) return "CRÍTICO"
+      if (l ~ /^alto/) return "ALTO"
+      if (l ~ /^m(e|é|É)dio/) return "MÉDIO"
+      if (l ~ /^baixo/) return "BAIXO"
+      return ""
     }
-    sev != "" && /^[[:space:]*_-]*Onde:/ { sub(/^[^:]*:/, ""); onde = limpa($0); next }
-    sev != "" && /^[[:space:]*_-]*Defeito:/ { sub(/^[^:]*:/, ""); defeito = limpa($0); next }
-    /^[[:space:]*_-]*A-[0-9]+[[:space:]]*(→|->)[[:space:]]*(mitigado|aberto)/ { print "REF\t" limpa($0) " (" src ")" > "/dev/stderr"; next }
+    # Cabeçalho: [A-n] em qualquer ponto da linha ("1) [A-1]", "Achado [A-1] —", "**[A-1]**"), seguido da severidade.
+    /\[A-[0-9]+\]/ {
+      match($0, /\[A-[0-9]+\]/); id0 = substr($0, RSTART + 1, RLENGTH - 2); resto0 = substr($0, RSTART + RLENGTH)
+      s0 = sevde(resto0)
+      if (s0 != "") {
+        sai(); lid = id0; resto = resto0; sev = s0
+        n = split(resto, p, "·"); lente = (n >= 2 ? limpa(p[2]) : "?")
+        conf = "?"; if (match(resto, /confian(c|ç)a[[:space:]]*[0-9]+/)) { c = substr(resto, RSTART, RLENGTH); gsub(/[^0-9]/, "", c); conf = c }
+        onde = ""; defeito = ""; lin = FNR
+        next
+      }
+      # [A-n] no começo da linha, sem severidade que se reconheça: não vira achado, mas não some.
+      if ($0 ~ /^[^A-Za-z]*\[A-[0-9]+\]/) { sai(); print "SEM\t" src ":" FNR " [" id0 "] (sem severidade reconhecida)" > "/dev/stderr"; next }
+      # [A-n] no meio do texto, sem severidade: menção, não cabeçalho.
+    }
+    # Onde de bloco aberto vale uma vez. Um segundo Onde, ou um Onde sem bloco, é de cabeçalho que não foi reconhecido:
+    # fecha o bloco aberto (que fica com o próprio lugar) e é avisado.
+    /^[[:space:]*_-]*Onde:/ {
+      if (sev != "" && onde == "") { sub(/^[^:]*:/, ""); onde = limpa($0); next }
+      sai(); print "SEM\t" src ":" FNR " (Onde sem cabeçalho [A-n] reconhecido)" > "/dev/stderr"; next
+    }
+    /^[[:space:]*_-]*Defeito:/ { if (sev != "" && defeito == "") { sub(/^[^:]*:/, ""); defeito = limpa($0) } next }
+    # Referência a achado já julgado, sozinha na linha ou logo depois do título "REFERÊNCIAS:" do molde do adversário.
+    /^[[:space:]*_-]*([Rr][Ee][Ff][Ee][Rr](Ê|ê|E|e)[Nn][Cc][Ii][Aa][Ss][[:space:]*_]*:[[:space:]*_-]*)?A-[0-9]+[[:space:]]*(→|->)[[:space:]]*([Mm]itigado|[Aa]berto)/ {
+      l = $0; sub(/^[[:space:]*_-]*[Rr][Ee][Ff][Ee][Rr][^:]*:/, "", l)
+      print "REF\t" limpa(l) "\t" src > "/dev/stderr"; next
+    }
     END { sai() }
   ' "$r" >>"$tmp" 2>>"$tmp.ref"
 done
@@ -81,7 +119,31 @@ if [ -z "$lidos" ]; then
   exit 0
 fi
 
-maior=$(grep -oE '\bA-[0-9]+\b' "$ach" | grep -oE '[0-9]+' | sort -n | tail -n 1)
+# Separa as referências dos cabeçalhos sem severidade que o awk mandou para o mesmo arquivo.
+grep '^SEM' "$tmp.ref" >"$tmp.sem"
+grep '^REF' "$tmp.ref" >"$tmp.r2"
+mv -f "$tmp.r2" "$tmp.ref"
+
+# Máscara campo a campo, antes de montar as linhas: cada texto do revisor (lente, Onde, Defeito, referência) numa linha
+# só, e a linha de BEGIN ou END de chave privada trocada antes, para a regra de chave (que tem estado) não atravessar
+# campos e o "_KEY até o fim da linha" não comer a origem nem os achados seguintes.
+mascara_coluna() { # mascara_coluna <arquivo TSV> <coluna>...
+  local f=$1 m=$1.m
+  shift
+  [ "$mascara" = 1 ] && [ -s "$f" ] || return 0
+  awk -F'\t' -v cols="$*" 'BEGIN { n = split(cols, c, " ") } { for (i = 1; i <= n; i++) print $(c[i]) }' "$f" |
+    awk '/-----(BEGIN|END) [A-Z ]*PRIVATE KEY/ { print "<OMITIDO chave privada>"; next } { print }' | mascarar >"$m" || return 1
+  [ "$(grep -c '' "$m")" -eq $(($(grep -c '' "$f") * $#)) ] || return 1
+  awk -F'\t' -v cols="$*" 'BEGIN { OFS = "\t"; n = split(cols, c, " ") }
+    NR == FNR { v[NR] = $0; next }
+    { for (i = 1; i <= n; i++) $(c[i]) = v[(FNR - 1) * n + i]; print }' "$m" "$f" >"$f.x" && mv -f "$f.x" "$f"
+  rm -f "$m"
+}
+mascara_coluna "$tmp" 4 6 7 && mascara_coluna "$tmp.ref" 2 ||
+  { echo "a máscara de segredo falhou ou mudou o número de linhas; nada foi gravado" >&2; exit 2; }
+
+# Maior ID só das linhas de achado que este script escreveu ("- A-n · "): um A-9999 citado num Defeito não conta.
+maior=$(grep -oE '^- A-[0-9]+ · ' "$ach" | grep -oE '[0-9]+' | sort -n | tail -n 1)
 maior=${maior:-0}
 [ -n "$rodada" ] || rodada=$(($(grep -cE "^## Rodada [0-9]+ · $portao" "$ach") + 1))
 
@@ -109,17 +171,22 @@ resumo=$(awk -F'\t' '{ c[$5]++; if ($7 != "?" && $7 + 0 < 7) s++ } END {
   printf "%s%s", o, (s ? "; " s " suspeita" (s > 1 ? "s" : "") " (confiança abaixo de 7)" : "") }' "$tmp.ord")
 grupos=$(awk -F'\t' '$13 != "—" { g[$13] = 1 } END { print length(g) + 0 }' "$tmp.ord")
 
+# O registro de lidos fica fora da máscara: é por ele que um relatório já lido é reconhecido.
+printf '\n## Rodada %s · %s · %s\n<!-- lidos:%s -->\n' "$rodada" "$portao" "$(date '+%Y-%m-%d %H:%M')" "$lidos" >>"$ach"
 {
-  printf '\n## Rodada %s · %s · %s\n' "$rodada" "$portao" "$(date '+%Y-%m-%d %H:%M')"
-  printf '<!-- lidos:%s -->\n' "$lidos"
   awk -F'\t' '{ printf "- %s · %s · %s · c%s · %s · %s · %s · origem %s:%s [%s]\n", $2, $5, $6, $7, $8, $13, $9, $10, $12, $11 }' "$tmp.ord"
   if [ -s "$tmp.ref" ]; then
     echo "Referências a achados já julgados:"
-    sed 's/^REF\t/- /' "$tmp.ref"
+    awk -F'\t' '{ printf "- %s (%s)\n", $2, $3 }' "$tmp.ref"
+  fi
+  if [ -s "$tmp.sem" ]; then
+    echo "Não contados: cabeçalho [A-n] sem severidade reconhecida, sem Onde nem Defeito, ou Onde solto (abra o relatório e julgue à mão):"
+    sed 's/^SEM\t/- /' "$tmp.sem"
   fi
   echo "Vereditos (uma linha por achado: A-n → confirmado | falso: motivo | incerto · rota · agrupado com A-m):"
 } >>"$ach"
 
+{
 printf 'JULGAR rodada %s · %s · %s achado%s (%s) · %s grupo%s · detalhe em %s\n' "$rodada" "$portao" "$total" \
   "$([ "$total" -eq 1 ] || echo s)" "${resumo:-nenhum}" "$grupos" "$([ "$grupos" -eq 1 ] || echo s)" "$ach"
 [ -z "$pulados" ] || echo "já lidos antes, pulados: $pulados"
@@ -130,6 +197,12 @@ if [ "$total" -gt 0 ]; then
 fi
 if [ -s "$tmp.ref" ]; then
   echo "REFERÊNCIAS:"
-  sed 's/^REF\t/- /' "$tmp.ref"
+  awk -F'\t' '{ printf "- %s (%s)\n", $2, $3 }' "$tmp.ref"
 fi
+if [ -s "$tmp.sem" ]; then
+  echo "SEM SEVERIDADE OU SEM CABEÇALHO (não contados; abra o relatório e julgue à mão):"
+  sed 's/^SEM\t/- /' "$tmp.sem"
+fi
+[ "$mascara" = 1 ] || echo "(saída e achados.md sem máscara de segredo: falta o segredos.sh ou o sed GNU)"
+}
 exit 0

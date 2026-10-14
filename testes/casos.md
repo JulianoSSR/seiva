@@ -118,6 +118,16 @@ Os scripts têm teste automático em `testes/scripts/`, e todos rodam com `for t
 - Esperado: o `checar-skill.sh` passa; um link quebrado em `referencias/` continua reprovando.
 - Reprova se: falha por causa do `.seiva/`, ou deixa passar link quebrado fora dele.
 
+**C14 · Revisor fora do molde**
+- Situação: o relatório do revisor traz `[A-2] Crítico · dados` (caixa fora do molde), `1) [A-3] ALTO` e `**Achado [A-5]** BAIXO` (prefixo antes do ID), um `[A-4] Grave` (severidade que não existe), um bloco com `Onde:` debaixo de um cabeçalho sem `[A-n]`, um `MINHA_KEY` e um BEGIN de chave no texto de um Defeito, e `REFERÊNCIAS: A-7 → mitigado em c.sh:5` na mesma linha do título.
+- Esperado: o `julgar-pre.sh` conta o Crítico como CRÍTICO e os de prefixo também, cada um com o próprio lugar; lista o `[A-4]` e o `Onde:` solto com `relatório:linha`, para o orquestrador julgar à mão; mascara só o texto do Defeito, sem perder a origem nem os achados seguintes; lê a referência ao A-7.
+- Reprova se: um achado some, o Onde de um cai em outro, ou a referência é descartada sem aviso.
+
+**C15 · Citação que sai do repositório**
+- Situação: o relatório do batedor cita `../fora/credencial.cfg:1`, um caminho absoluto fora do repositório e um link de dentro que aponta para fora; outra citação cai no meio de uma chave privada.
+- Esperado: o `ficha-tecnica.sh` não lê nenhuma das três e as lista como puladas, "fora do repositório"; o trecho da chave sai com cada linha dela trocada por `<OMITIDO chave privada>`, a numeração intacta e os trechos seguintes no lugar.
+- Reprova se: o conteúdo de fora aparece em `trechos.md` ou nas fichas, ou o corpo da chave sai em claro.
+
 ## Projeto manda
 
 **P1 · Regra do projeto contra regra da seiva**
@@ -262,6 +272,16 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 - Situação: o usuário cola o relatório do `/usage`, gerado às 14:04:42Z, com 73%; a linha estimava 40%.
 - Esperado: `orcamento-local.sh --calibrar 73 --em 2026-10-13T14:04:42Z`; a leitura entra como ponto, a linha passa a contar "1 leitura do /usage" e, dentro da janela aberta, vira âncora: o percentual parte dos 73%, e só o gasto depois das 14:04:42Z é estimado. Uma leitura que implica limite maior não afrouxa o freio enquanto um ponto menor estiver entre os 5 mais recentes.
 - Reprova se: calibra sem `--em` quando a sessão gastou depois do relatório, edita o `calibracao.json` à mão, ou mantém a estimativa antiga sem dizer.
+
+**O12 · Leitura digitada errada**
+- Situação: o `/usage` mostrava 91%, e o orquestrador gravou `--calibrar 19`. A linha avisa que o limite dessa leitura é muitas vezes o dos outros pontos.
+- Esperado: o orquestrador diz ao usuário, roda `orcamento-local.sh --leituras`, `--descartar <hora da leitura>` e grava de novo com 91%.
+- Reprova se: segue com a leitura errada, edita o `calibracao.json` à mão, ou usa o `--calibrar auto` achando que ele apaga a leitura.
+
+**O13 · Transcript em formato novo**
+- Situação: uma versão nova do Claude Code muda o lugar do `usage` nas respostas, e o transcript desta sessão não tem nenhum registro de uso reconhecível.
+- Esperado: `ORCAMENTO desligado` com o motivo "o formato do Claude Code pode ter mudado"; o orquestrador diz isso uma vez e segue com a Próxima ação gravada antes de cada leva.
+- Reprova se: a linha diz `ok` com 0%, ou o orquestrador trata o 0% como medida.
 
 ## Retomada
 

@@ -243,6 +243,8 @@ u "$O" grande 7000 0 0 1000 300000 claude-opus-teste
 roda --sessao "$SID"
 eq "modelo que já passou de 200 mil: janela de 1 mi" 1000000 "$(campo .contexto.janela)"
 eq "janela de 1 mi: ok" 0 "$RC"
+tem "janela de 1 mi pelo histórico: a nota diz que é deduzida" "$SAI" "janela deduzida pelo histórico do modelo"
+eq "janela de 1 mi pelo histórico: a fonte fica no estado" deduzida "$(campo .contexto.janela_fonte)"
 roda --sessao outra-sessao
 eq "sessão sem transcript: contexto não medido" null "$(campo .contexto.tokens)"
 tem "sessão sem transcript: a nota diz" "$SAI" "contexto não medido"
@@ -290,6 +292,173 @@ mkdir -p "$T/tarefa"
 roda --sessao "$SID" --tarefa "$T/tarefa"
 tem "--tarefa: retomar gravado" "$SAI" "retomar gravado"
 eq "--tarefa: o retomar aponta o registro" "$T/tarefa/registro.md" "$(cat "$T/c/seiva/retomar")"
+
+# --- janela de contexto: a da própria sessão manda; o histórico vence em 30 dias -----
+novo
+u "$M" a 900 0 0 1000 250000
+u "$M" b 60 0 0 1000 100000
+roda --sessao "$SID"
+eq "sessão que já passou de 200 mil: janela de 1 mi" 1000000 "$(campo .contexto.janela)"
+eq "sessão acima de 200 mil: janela medida" medida "$(campo .contexto.janela_fonte)"
+nao_tem "janela medida: sem aviso de dedução" "$SAI" "janela deduzida"
+novo
+u "$M" a 60 0 0 1000 100000
+mkdir -p "$T/c/seiva"
+jq -nc --argjson v $((AGORA - 3600)) --argjson velho $((AGORA - 31 * 86400)) \
+  '{versao: 1, varrido_ate: $v, pontos: [], leituras: [], contexto_1m: {"claude-opus-teste": $velho}}' >"$CAL"
+roda --sessao "$SID"
+eq "histórico de 1 mi com mais de 30 dias: volta a 200 mil" 200000 "$(campo .contexto.janela)"
+eq "histórico vencido sai da calibração" null "$(jq -c '.contexto_1m["claude-opus-teste"]' "$CAL")"
+# Calibração da 1.2.2 (contexto_max sem data): vira contexto_1m com a data da última varredura.
+novo
+u "$M" a 60 0 0 1000 100000
+mkdir -p "$T/c/seiva"
+jq -nc --argjson v $((AGORA - 3600)) '{versao: 1, varrido_ate: $v, pontos: [], leituras: [], contexto_max: {"claude-opus-teste": 300000}}' >"$CAL"
+roda --sessao "$SID"
+eq "contexto_max da 1.2.2: janela de 1 mi deduzida" deduzida "$(campo .contexto.janela_fonte)"
+eq "contexto_max da 1.2.2: migrado para contexto_1m" $((AGORA - 3600)) "$(jq '.contexto_1m["claude-opus-teste"]' "$CAL")"
+eq "contexto_max da 1.2.2: o campo velho sai" false "$(jq 'has("contexto_max")' "$CAL")"
+
+# --- leitura do /usage: recibo, lista e volta -------------------------------------------
+novo
+u "$M" a 900 0 0 1000 0
+u "$O" outra 600 0 0 1000 0
+roda --sessao "$SID" --calibrar 50 --em $((AGORA - 300))
+tem "leitura: o recibo diz como desfazer" "$SAI" "para desfazer: orcamento-local.sh --descartar $(iso $((AGORA - 300)))"
+nao_tem "1ª leitura: sem comparação, sem alerta" "$SAI" "ATENÇÃO"
+# 10% sobre o mesmo gasto dá um limite 5 vezes maior: alerta.
+roda --sessao "$SID" --calibrar 10 --em $((AGORA - 200))
+tem "leitura que foge dos outros pontos: alerta" "$SAI" "ATENÇÃO: o limite que ela dá é 5×"
+roda --leituras
+eq "--leituras: código 0" 0 "$RC"
+tem "--leituras: conta as duas" "$SAI" "LEITURAS 2"
+tem "--leituras: hora em UTC que o --descartar aceita" "$SAI" "$(iso $((AGORA - 200))) · 10%"
+roda --descartar "$(iso $((AGORA - 200)) | sed 's/Z$/.123Z/')"
+eq "--descartar por hora ISO: código 0" 0 "$RC"
+tem "--descartar: diz qual saiu" "$SAI" "DESCARTADA a leitura de $(iso $((AGORA - 200))) (10%)"
+eq "--descartar: sobra uma leitura" 1 "$(jq '.leituras | length' "$CAL")"
+roda --descartar ultima
+eq "--descartar ultima: sobra nenhuma" 0 "$(jq '.leituras | length' "$CAL")"
+roda --descartar ultima
+eq "--descartar sem leitura: uso errado" 2 "$RC"
+tem "--descartar sem leitura: aponta o --leituras" "$ERR" "--leituras"
+roda --descartar ontem
+eq "--descartar com hora que não é hora: uso errado" 2 "$RC"
+roda --leituras --calibrar 50
+eq "--leituras com --calibrar: uso errado" 2 "$RC"
+roda --leituras --descartar ultima
+eq "--leituras com --descartar: uso errado" 2 "$RC"
+# --calibrar auto não apaga leitura: só o --descartar apaga.
+roda --sessao "$SID" --calibrar 50 --em $((AGORA - 300))
+roda --sessao "$SID" --calibrar auto
+eq "--calibrar auto mantém as leituras" 1 "$(jq '.leituras | length' "$CAL")"
+
+# --- calibração ilegível ou de outra forma: guardada à parte, nunca em silêncio --------
+novo
+u "$M" a 60 0 0 1000 0
+mkdir -p "$T/c/seiva"
+printf '{versao: quebrado' >"$CAL"
+roda --sessao "$SID"
+tem "calibração ilegível: aviso na linha" "$SAI" "guardada em calibracao.json.invalido-"
+eq "calibração ilegível: cópia guardada" 1 "$(ls "$T/c/seiva" | grep -c '^calibracao\.json\.invalido-')"
+eq "calibração ilegível: refeita" 1 "$(jq '.versao' "$CAL")"
+novo
+u "$M" a 60 0 0 1000 0
+mkdir -p "$T/c/seiva"
+jq -nc --argjson v $((AGORA - 3600)) '{versao: 1, varrido_ate: $v, pontos: [], leituras: "73"}' >"$CAL"
+roda --sessao "$SID"
+tem "campo de tipo errado: guardada, não desligado" "$SAI" "guardada em calibracao.json.invalido-"
+nao_tem "campo de tipo errado: a causa não é leitura de transcript" "$SAI" "não consegui ler os transcripts"
+# A 1.2.0 gravava uma leitura só, em "manual": ela vira a 1ª leitura.
+novo
+u "$M" a 600 0 0 1000 0
+mkdir -p "$T/c/seiva"
+jq -nc --argjson v $((AGORA - 3600)) --argjson e $((AGORA - 300)) \
+  '{versao: 1, varrido_ate: $v, pontos: [], manual: {em: $e, pct: 50, x: 1000, y: 0}}' >"$CAL"
+roda --sessao "$SID"
+eq "manual da 1.2.0 vira leitura" 1 "$(jq '.leituras | length' "$CAL")"
+eq "manual da 1.2.0: o campo velho sai" false "$(jq 'has("manual")' "$CAL")"
+nao_tem "manual da 1.2.0: não é tratado como inválido" "$SAI" "invalido"
+
+# --- duas execuções ao mesmo tempo não perdem leitura ------------------------------------
+novo
+u "$M" a 900 0 0 1000 0
+roda --sessao "$SID"
+bash "$LOC" --sessao "$SID" --calibrar 40 --em $((AGORA - 600)) >/dev/null 2>&1 &
+p1=$!
+bash "$LOC" --sessao "$SID" --calibrar 60 --em $((AGORA - 500)) >/dev/null 2>&1 &
+p2=$!
+wait "$p1" "$p2"
+eq "duas leituras gravadas ao mesmo tempo: as duas ficam" 2 "$(jq '.leituras | length' "$CAL")"
+if command -v flock >/dev/null 2>&1; then
+  ( flock 9; sleep 2 ) 9>"$T/c/seiva/.trava" &
+  p3=$!
+  sleep 0.3
+  t0=$(date +%s)
+  roda --sessao "$SID"
+  wait "$p3"
+  eq "com a trava presa, espera em vez de seguir" 1 "$(( $(date +%s) - t0 >= 1 ))"
+  eq "com a trava presa por 2 s: termina ok" 0 "$RC"
+fi
+
+# --- formato do transcript mudou: desligado, não 0% ------------------------------------
+novo
+jq -nc --arg ts "$(iso $((AGORA - 60)))" \
+  '{type: "assistant", timestamp: $ts, message: {id: "m1", model: "claude-opus-teste", uso: {entrada: 1000}}}' >>"$M"
+roda --sessao "$SID"
+tem "transcript desta sessão sem registro de uso reconhecível: desligado" "$SAI" "ORCAMENTO desligado"
+tem "formato mudou: diz o motivo" "$SAI" "formato do Claude Code pode ter mudado"
+eq "formato mudou: código 0" 0 "$RC"
+novo
+jq -nc --arg ts "$(iso $((AGORA - 60)))" '{type: "user", timestamp: $ts, message: {role: "user", content: "oi"}}' >>"$M"
+roda --sessao "$SID"
+nao_tem "sessão que só tem a mensagem do usuário: não acusa formato" "$SAI" "formato"
+
+# --- caminho com acento: a pasta do projeto é achada -----------------------------------
+for loc in C.UTF-8 C; do
+  novo
+  mkdir -p "$T/wá"
+  W=$T/tr/$(printf '%s' "$T/wá" | LC_ALL=$loc sed 's/[^A-Za-z0-9]/-/g')/$SID.jsonl
+  u "$W" a 600 0 0 1000 50000
+  SAI=$(cd "$T/wá" && bash "$LOC" 2>/dev/null)
+  tem "caminho com acento, pasta nomeada em $loc: sessão deduzida" "$SAI" "sessão deduzida"
+  eq "caminho com acento, pasta nomeada em $loc: contexto medido" 51000 "$(campo .contexto.tokens)"
+done
+
+# --- calibração inválida: o aviso sai também nas saídas curtas ------------------------
+for modo in leituras descartar calibrar; do
+  novo
+  u "$M" a 60 0 0 1000 0
+  mkdir -p "$T/c/seiva"
+  printf '{versao: quebrado' >"$CAL"
+  case $modo in
+    leituras) roda --leituras ;;
+    descartar) roda --descartar ultima ;;
+    calibrar) roda --sessao "$SID" --calibrar 50 --em $((AGORA - 7200)) ;;
+  esac
+  tem "calibração inválida com --$modo: o aviso sai" "$SAI$ERR" "guardada em calibracao.json.invalido-"
+done
+
+# --- resposta de erro da API que não é de limite não acusa formato ----------------------
+novo
+jq -nc --arg ts "$(iso $((AGORA - 60)))" \
+  '{type: "assistant", timestamp: $ts, isApiErrorMessage: true, apiErrorStatus: 529,
+    message: {id: "erro", model: "<synthetic>", content: [{type: "text", text: "API Error: 529 Overloaded"}]}}' >>"$M"
+roda --sessao "$SID"
+nao_tem "sessão nova só com erro 529: não acusa formato" "$SAI" "formato do Claude Code"
+
+# --- trava que não se abre: segue com aviso, sem a mensagem de espera ---------------------
+if command -v flock >/dev/null 2>&1; then
+  novo
+  u "$M" a 60 0 0 1000 0
+  mkdir -p "$T/c/seiva"
+  : >"$T/c/seiva/.trava"
+  chmod 000 "$T/c/seiva/.trava"
+  roda --sessao "$SID"
+  chmod 600 "$T/c/seiva/.trava"
+  nao_tem "trava sem permissão: não diz que outra execução a segura" "$SAI" "há mais de 60 s"
+  tem "trava sem permissão: avisa que seguiu sem trava" "$SAI" "sem trava nesta execução"
+fi
 
 # --- sem jq: desligado --------------------------------------------------------------
 novo

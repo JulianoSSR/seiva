@@ -8,7 +8,8 @@
 #   --de      lê as citações caminho:linha e caminho:início-fim do relatório (o do batedor, em geral), gera a ficha de
 #             cada arquivo citado e grava <pasta>/trechos.md com cada citação e 10 linhas antes e depois, juntando os
 #             intervalos que se encostam no mesmo arquivo
-#   Caminho relativo é relativo à raiz do repositório (git rev-parse --show-toplevel), ou à pasta atual fora de git.
+#   Caminho relativo é relativo à raiz do repositório (git rev-parse --show-toplevel), ou à pasta atual fora de git; rode
+#   da raiz do projeto. Caminho absoluto, `..` ou link que saia dessa raiz não é lido e aparece como pulado.
 #
 # Extração por expressão regular (grep), sem tree-sitter nem modelo: assinatura em formato incomum pode faltar, e a
 # ficha diz isso no topo. Tetos: 40 linhas por seção, 160 caracteres por linha, 30 arquivos e 400 linhas de trecho.
@@ -53,14 +54,36 @@ pasta_ignorada "$pasta" || recusa "a pasta $pasta não está ignorada pelo git (
 [ -z "$relatorio" ] || [ -r "$relatorio" ] || recusa "não consigo ler o relatório: $relatorio"
 
 raiz=$(git rev-parse --show-toplevel 2>/dev/null) || raiz=$(pwd -P)
-resolve() { case $1 in /*) printf '%s\n' "$1" ;; *) printf '%s\n' "$raiz/${1#./}" ;; esac; }
+raiz=$(cd -- "$raiz" 2>/dev/null && pwd -P) || recusa "não consegui resolver a raiz do repositório"
+# Caminho citado -> caminho real do arquivo, só se ficar dentro da raiz. A citação vem de relatório escrito por outro
+# modelo: caminho absoluto de fora, "..", ou link que sai da raiz não é lido. Código 1: não existe; 3: fora da raiz.
+resolve() {
+  local c d
+  case $1 in /*) c=$1 ;; *) c=$raiz/${1#./} ;; esac
+  [ -f "$c" ] || return 1
+  d=$(cd -- "$(dirname -- "$c")" 2>/dev/null && pwd -P) || return 1
+  c=$d/${c##*/}
+  if [ -L "$c" ]; then
+    c=$(realpath -- "$c" 2>/dev/null || readlink -f -- "$c" 2>/dev/null) || return 3
+  fi
+  case $c in "$raiz"/*) printf '%s\n' "$c" ;; *) return 3 ;; esac
+}
+# O arquivo com cada linha de chave privada, do BEGIN ao END, trocada por <OMITIDO chave privada>, sem mudar a
+# numeração. Vem antes de cortar: o mascarar trabalha com estado, e um corte no meio da chave deixaria o corpo dela
+# sem o BEGIN, em claro (ou um BEGIN sem END engoliria o resto da saída).
+sem_chave() {
+  awk '
+    dentro { if ($0 ~ /-----END [A-Z ]*PRIVATE KEY[A-Z ]*-----/) dentro = 0; print "<OMITIDO chave privada>"; next }
+    /-----BEGIN [A-Z ]*PRIVATE KEY[A-Z ]*-----/ { dentro = ($0 !~ /-----END [A-Z ]*PRIVATE KEY[A-Z ]*-----/); print "<OMITIDO chave privada>"; next }
+    { print }' "$1"
+}
 fichas=$pasta/fichas
 mkdir -p -- "$fichas" || recusa "não deu para criar $fichas"
 pasta_ignorada "$fichas" || recusa "$fichas não está ignorada pelo git (link simbólico?); nada foi gravado"
 
 secao() { # secao <título> <arquivo> <regex ERE>
   local r
-  r=$(grep -nE -- "$3" "$2" 2>/dev/null | cut -c1-160 | head -n 41)
+  r=$(sem_chave "$2" | grep -nE -- "$3" 2>/dev/null | cut -c1-160 | head -n 41)
   [ -n "$r" ] || return 0
   printf '\n## %s\n' "$1"
   printf '%s\n' "$r" | head -n 40
@@ -70,8 +93,7 @@ secao() { # secao <título> <arquivo> <regex ERE>
 ficha() { # ficha <caminho como citado>
   local nome f destino imp exp ass chave
   nome=${1#./}
-  f=$(resolve "$nome")
-  [ -f "$f" ] || return 1
+  f=$(resolve "$nome") || return $?
   destino="$fichas/$(printf '%s' "$nome" | sed 's#^/##; s#/#__#g').md"
   case $f in
     *.js | *.jsx | *.ts | *.tsx | *.mjs | *.cjs)
@@ -150,11 +172,12 @@ gera() {
   case $vistos in *" $1 "*) return 0 ;; esac
   vistos+="$1 "
   [ "$n_fichas" -lt 30 ] || { puladas+=("$1 (teto de 30 arquivos)"); return 0; }
-  if ficha "$1"; then
-    n_fichas=$((n_fichas + 1))
-  else
-    puladas+=("$1 (não existe a partir de $raiz)")
-  fi
+  ficha "$1"
+  case $? in
+    0) n_fichas=$((n_fichas + 1)) ;;
+    3) puladas+=("$1 (fora do repositório: só se lê dentro de $raiz)") ;;
+    *) puladas+=("$1 (não existe a partir de $raiz)") ;;
+  esac
 }
 for a in ${arquivos[@]+"${arquivos[@]}"}; do gera "$a"; done
 
@@ -170,8 +193,11 @@ if [ -n "$relatorio" ]; then
     printf 'Gerado por scripts/ficha-tecnica.sh: cada citação com 10 linhas antes e depois, intervalos do mesmo arquivo juntados. Segredo de padrão conhecido sai mascarado. Para ler além disto, abra só o intervalo de que precisa.\n'
     printf '%s\n' "$cits" | awk 'NF == 3' | sort -k1,1 -k2,2n | while read -r nome i f; do
       arq=$(resolve "$nome")
-      [ -f "$arq" ] || { echo "PULADA $nome:$i"; continue; }
-      echo "$nome $i $f"
+      case $? in
+        0) echo "$nome $i $f" ;;
+        3) echo "PULADA $nome:$i (fora do repositório: só se lê dentro de $raiz)" ;;
+        *) echo "PULADA $nome:$i (não existe a partir de $raiz)" ;;
+      esac
     done | awk -v teto=400 '
       /^PULADA / { print > "/dev/stderr"; next }
       { a = $1; i = $2 - 10; if (i < 1) i = 1; f = $3 + 10
@@ -184,7 +210,7 @@ if [ -n "$relatorio" ]; then
       [ "$f" -le "$total" ] || f=$total
       [ "$i" -le "$f" ] || continue
       printf '\n## %s:%s-%s\n```\n' "$nome" "$i" "$f"
-      awk -v i="$i" -v f="$f" 'NR >= i && NR <= f { printf "%5d  %s\n", NR, substr($0, 1, 200) } NR > f { exit }' "$arq"
+      sem_chave "$arq" | awk -v i="$i" -v f="$f" 'NR >= i && NR <= f { printf "%5d  %s\n", NR, substr($0, 1, 200) } NR > f { exit }' 
       printf '```\n'
     done
   } | awk -v teto=400 '/^ *[0-9]+  / { if (++n > teto) { if (!avisou) { print "(teto de 400 linhas de trecho: o resto foi cortado)"; avisou = 1 } next } } { print }' |
@@ -192,7 +218,7 @@ if [ -n "$relatorio" ]; then
   intervalos=$(grep -c '^## ' "$destino")
   linhas=$(grep -cE '^ *[0-9]+  ' "$destino")
   while read -r p; do
-    [ -n "$p" ] && puladas+=("${p#PULADA } (não existe a partir de $raiz)")
+    [ -n "$p" ] && puladas+=("${p#PULADA }")
   done <"$pasta/.puladas"
   rm -f "$pasta/.puladas"
   for nome in $(printf '%s\n' "$cits" | awk 'NF == 3 { print $1 }' | sort -u); do gera "$nome"; done

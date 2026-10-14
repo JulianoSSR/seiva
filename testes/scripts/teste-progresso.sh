@@ -143,6 +143,10 @@ tem "pendentes lista a tarefa" "$SAI" "queda-n2 · 4 Atacar o plano"
 roda "$P" marcar 9 feita
 roda "$W" pendentes
 tem "tarefa com a etapa 9 feita sai da lista" "$SAI" "nenhuma tarefa por terminar"
+roda "$P" marcar 9 "pulada: tarefa cancelada pelo usuário"
+roda "$W" pendentes
+tem "tarefa com a etapa 9 pulada também sai da lista, como no conferir" "$SAI" "nenhuma tarefa por terminar"
+roda "$P" marcar 9 feita
 
 # --- tarefa de antes do progresso.md -----------------------------------------------
 V=$W/tarefas/2026-01-01-velha

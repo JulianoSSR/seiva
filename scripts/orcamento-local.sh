@@ -5,17 +5,23 @@
 # continua sendo o único que decide entre ok, restrito e parar. Não precisa de statusline, de hook nem de terminal.
 #
 # Uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct> [--em <hora>] | --calibrar auto]
+#      orcamento-local.sh --leituras | --descartar <hora|ultima>
 #   --tarefa          repassado ao orcamento.sh, que grava o "retomar" da barra
 #   --sessao          a sessão cujo contexto se mede. Padrão: $CLAUDE_CODE_SESSION_ID (o app desktop define; medido em
 #                     2026-10-13). Sem ela, o transcript mais recente da pasta do projeto, com o aviso "sessão deduzida"
 #   --calibrar <pct>  leitura do /usage (ou da página de uso do claude.ai): <pct> é o uso da janela de 5 horas que
-#                     ele mostrou (de 10 a 100). Vira um ponto de calibração, como um limite batido
+#                     ele mostrou (de 10 a 100). Vira um ponto de calibração, como um limite batido. A linha diz a hora
+#                     gravada e como desfazer, e avisa quando o limite que a leitura dá foge do dobro ou da metade dos outros
 #   --em <hora>       quando a leitura foi feita: epoch ou ISO em UTC (2026-10-13T14:04:42.667Z, como o relatório do
 #                     /usage traz). Sem ela, agora. Conta só o que a janela tinha gastado até aquela hora
-#   --calibrar auto   refaz a calibração automática varrendo os transcripts dos últimos 30 dias
+#   --calibrar auto   refaz a calibração automática varrendo os transcripts dos últimos 30 dias. Não mexe nas leituras
+#   --leituras        lista as leituras do /usage gravadas, com a hora em UTC que o --descartar aceita, e sai
+#   --descartar <h>   apaga a leitura gravada naquela hora (epoch ou ISO em UTC, ou "ultima") e sai
 #
-# Variáveis: PESO_CACHE_LEITURA (padrão 0.01), SEIVA_JANELA_CONTEXTO (tokens; sem ela, 1 milhão para o modelo que já
-# passou de 200 mil de contexto em algum transcript e 200 mil para os outros), SEIVA_TRANSCRIPTS (~/.claude/projects).
+# Variáveis: PESO_CACHE_LEITURA (padrão 0.01), SEIVA_JANELA_CONTEXTO (tokens; força a janela de contexto),
+# SEIVA_TRANSCRIPTS (~/.claude/projects). Sem SEIVA_JANELA_CONTEXTO, a janela é de 1 milhão quando a própria sessão já
+# passou de 200 mil (medida) ou quando o modelo passou de 200 mil em algum transcript dos últimos 30 dias (deduzida, e
+# a linha diz isso: o transcript grava o mesmo nome de modelo nas janelas de 200 mil e de 1 milhão); senão, 200 mil.
 #
 # Saída: a linha do orcamento.sh com a fonte no fim. Códigos iguais aos dele: 0, 10 (restrito), 20 (parar); 2 é uso errado.
 #
@@ -34,32 +40,52 @@
 #   O percentual é ESTIMADO: a contabilidade da assinatura não é pública. É freio, não medidor oficial.
 #
 # Arquivos, em ${XDG_CACHE_HOME:-$HOME/.cache}/seiva/, modo 600: orcamento-local.json (o estado) e calibracao.json.
+# Duas execuções ao mesmo tempo esperam uma pela outra (flock em .trava, até 60 s). Calibração ilegível ou de forma
+# desconhecida é guardada como calibracao.json.invalido-<epoch> e refeita, com aviso na linha.
+# Transcript desta sessão mexido nos últimos 10 minutos, com resposta do modelo (fora as de erro da API) e nenhum
+# registro de uso reconhecível, sai como "desligado": o formato do transcript mudou, e a estimativa daria 0% em silêncio.
 # Do transcript só saem números, horários, o nome do modelo e o texto do aviso de limite: nenhum texto de conversa.
 set -uo pipefail
 export LC_ALL=C
 umask 077
 
-uso() { echo "uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct> [--em <hora>] | --calibrar auto]" >&2; exit 2; }
+uso() { echo "uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct> [--em <hora>] | --calibrar auto] | --leituras | --descartar <hora|ultima>" >&2; exit 2; }
+# Epoch ou ISO em UTC (fração de segundo aceita) para epoch; vazio se não der.
+epoch_de() { case $1 in *[!0-9]*) jq -nr --arg t "$1" '$t | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601' 2>/dev/null ;; *) printf '%s\n' "$1" ;; esac; }
 
 tarefa=""
 sessao=""
 calibrar=""
 em=""
+leituras=0
+descartar=""
 while [ "$#" -gt 0 ]; do
   case $1 in
-    --tarefa | --sessao | --calibrar | --em)
+    --tarefa | --sessao | --calibrar | --em | --descartar)
       [ "$#" -ge 2 ] && [ -n "$2" ] || uso
       case $1 in
         --tarefa) tarefa=$2 ;;
         --sessao) sessao=$2 ;;
         --calibrar) calibrar=$2 ;;
         --em) em=$2 ;;
+        --descartar) descartar=$2 ;;
       esac
       shift 2
+      ;;
+    --leituras)
+      leituras=1
+      shift
       ;;
     *) uso ;;
   esac
 done
+if [ "$leituras" = 1 ] || [ -n "$descartar" ]; then
+  { [ -z "$calibrar$em" ] && { [ "$leituras" = 0 ] || [ -z "$descartar" ]; }; } || uso
+fi
+if [ -n "$descartar" ] && [ "$descartar" != ultima ]; then
+  descartar=$(epoch_de "$descartar")
+  [ -n "$descartar" ] || { echo "--descartar: use a hora que o --leituras mostra (ISO em UTC), um epoch ou \"ultima\"" >&2; exit 2; }
+fi
 case $calibrar in
   '' | auto) ;;
   *[!0-9.]* | *.*.* | .*) uso ;;
@@ -71,9 +97,7 @@ esac
 
 if [ -n "$em" ]; then
   case $calibrar in '' | auto) echo "--em só vale com --calibrar <pct>" >&2; exit 2 ;; esac
-  case $em in
-    *[!0-9]*) em=$(jq -nr --arg t "$em" '$t | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601' 2>/dev/null) || em="" ;;
-  esac
+  em=$(epoch_de "$em")
   [ -n "$em" ] || { echo "--em: use epoch ou ISO em UTC, como 2026-10-13T14:04:42Z" >&2; exit 2; }
 fi
 
@@ -101,13 +125,32 @@ agora=$(date +%s)
 [ -n "$em" ] || em=$agora
 avisos=""
 
-# Sessão: a do harness; sem ela, a do transcript mais recente na pasta do projeto (o nome da pasta é o caminho com
-# tudo que não é letra ou número trocado por hífen).
+# Uma execução por vez: a calibração é lida no começo e regravada no fim, e duas execuções juntas perderiam a leitura
+# gravada pela mais rápida.
+if command -v flock >/dev/null 2>&1; then
+  if { exec 9>"$dir/.trava"; } 2>/dev/null; then
+    flock -w 60 9 2>/dev/null ||
+      { echo "ORCAMENTO desligado — outra execução do orcamento-local.sh segura $dir/.trava há mais de 60 s"; exit 0; }
+  else
+    avisos+=" · não consegui abrir $dir/.trava: sem trava nesta execução"
+  fi
+else
+  avisos+=" · sem flock: duas execuções ao mesmo tempo podem perder uma leitura do /usage"
+fi
+
+# Sessão: a do harness; sem ela, a do transcript mais recente na pasta do projeto. O nome da pasta é o caminho com
+# tudo que não é letra ou número trocado por hífen, um por caractere; com acento no caminho, o hífen por byte (locale C)
+# fica de reserva, porque a regra do Claude Code para caractere fora do ASCII não foi medida.
 [ -n "$sessao" ] || sessao=${CLAUDE_CODE_SESSION_ID:-}
 sessao=${sessao//[^A-Za-z0-9._-]/}
 if [ -z "$sessao" ] && [ -d "$trans" ]; then
-  proj=$(printf '%s' "$PWD" | sed 's/[^A-Za-z0-9]/-/g')
-  ultimo=$(ls -t -- "$trans/$proj"/*.jsonl 2>/dev/null | head -n 1)
+  proj=""
+  for loc in C.UTF-8 C.utf8 C; do
+    p=$(printf '%s' "$PWD" | LC_ALL=$loc sed 's/[^A-Za-z0-9]/-/g' 2>/dev/null)
+    [ -n "$p" ] && [ -d "$trans/$p" ] && { proj=$p; break; }
+  done
+  ultimo=""
+  [ -z "$proj" ] || ultimo=$(ls -t -- "$trans/$proj"/*.jsonl 2>/dev/null | head -n 1)
   if [ -n "$ultimo" ]; then
     sessao=${ultimo##*/}
     sessao=${sessao%.jsonl}
@@ -116,10 +159,52 @@ if [ -z "$sessao" ] && [ -d "$trans" ]; then
   fi
 fi
 
+# Calibração: só a forma conhecida entra. A 1.2.0 gravava uma leitura só, em "manual"; ela vira a 1ª leitura.
+# O que não passa é guardado ao lado, nunca regravado por cima sem aviso.
 calj=null
-if [ -r "$cal" ]; then
-  calj=$(jq -c 'if type == "object" and .versao == 1 then . else null end' "$cal" 2>/dev/null) || calj=null
-  [ -n "$calj" ] || calj=null
+if [ -e "$cal" ]; then
+  calj=$(jq -c '
+    def num: type == "number";
+    if type == "object" and .versao == 1 then
+      (if (.manual | type) == "object" and .leituras == null then .leituras = [.manual] else . end | del(.manual))
+      | if ((.pontos // []) | type == "array" and all(.[]; type == "object" and (.r | num) and (.hit | num) and (.x | num) and (.y | num)))
+           and ((.leituras // []) | type == "array" and all(.[]; type == "object" and (.em | num) and (.pct | num) and (.x | num) and (.y | num)))
+           and ((.contexto_max // {}) | type == "object" and all(.[]; num))
+           and ((.contexto_1m // {}) | type == "object" and all(.[]; num))
+           and ((.varrido_ate // 0) | num)
+        then . else "invalido" end
+    else "invalido" end' "$cal" 2>/dev/null) || calj='"invalido"'
+  if [ -z "$calj" ] || [ "$calj" = '"invalido"' ]; then
+    guarda=$cal.invalido-$agora-$$
+    if mv -f -- "$cal" "$guarda" 2>/dev/null; then
+      avisos+=" · calibracao.json ilegível ou de forma desconhecida: guardada em ${guarda##*/} e refeita"
+    else
+      avisos+=" · calibracao.json ilegível e não consegui guardá-la à parte: refeita por cima"
+    fi
+    calj=null
+  fi
+fi
+
+# --leituras e --descartar: só a calibração, sem varrer transcript.
+if [ "$leituras" = 1 ]; then
+  [ "$calj" != null ] || { echo "LEITURAS 0 · sem calibração gravada$avisos"; exit 0; }
+  printf '%s' "$calj" | jq -r --argjson pcl "$pcl" '
+    def fmt: if . >= 1000000 then "\((. / 100000 | floor) / 10) mi" else "\(. / 1000 | floor) mil" end | gsub("\\."; ",");
+    (.leituras // []) as $l
+    | "LEITURAS \($l | length) (hora em UTC, para o --descartar)",
+      ($l | sort_by(.em) | .[] | "\(.em | todate) · \(.pct)% · limite que ela dá ≈ \((.x + $pcl * .y) / (.pct / 100) | fmt) tokens ponderados")'
+  exit 0
+fi
+if [ -n "$descartar" ]; then
+  [ "$calj" != null ] || { echo "--descartar: não há calibração gravada$avisos" >&2; exit 2; }
+  alvo=$(printf '%s' "$calj" | jq -r --arg d "$descartar" '(.leituras // []) | sort_by(.em)
+    | if $d == "ultima" then (last // empty | .em) else (map(select(.em == ($d | tonumber))) | first // empty | .em) end')
+  [ -n "$alvo" ] || { echo "--descartar: nenhuma leitura nessa hora. Veja orcamento-local.sh --leituras" >&2; exit 2; }
+  novo=$(printf '%s' "$calj" | jq -c --argjson a "$alvo" '.leituras |= map(select(.em != $a))')
+  tmpd=$(mktemp "$dir/.calibracao.XXXXXX") && printf '%s\n' "$novo" >"$tmpd" && mv -f "$tmpd" "$cal" ||
+    { rm -f -- "${tmpd:-}"; echo "--descartar: não consegui gravar $cal" >&2; exit 2; }
+  printf '%s' "$calj" | jq -r --argjson a "$alvo" '.leituras[] | select(.em == $a) | "DESCARTADA a leitura de \(.em | todate) (\(.pct)%)"'
+  exit 0
 fi
 
 # Quanto varrer: 30 dias na 1ª vez e no --calibrar auto; depois, desde a última varredura mais 5 horas, no mínimo
@@ -159,6 +244,7 @@ if [ -d "$trans" ]; then
                elif ($f | contains("/" + $sid + "/")) then 2 else 0 end),
            u: (.message.usage | [.input_tokens, .output_tokens, .cache_creation_input_tokens, .cache_read_input_tokens]
                | map(if type == "number" then . else 0 end))}
+      elif $sid != "" and (input_filename | endswith("/" + $sid + ".jsonl")) then {k: "a"}
       else empty end
   ' {} + >"$tmp" 2>/dev/null
 else
@@ -167,6 +253,13 @@ fi
 
 # O horário do aviso de limite vem no fuso do usuário, com o nome dele entre parênteses. A conta da hora usa esse fuso.
 tz=$(jq -r 'select(.k == "h") | .t | (capture("\\((?<z>[A-Za-z0-9_/+-]+)\\)\\s*$").z? // empty)' "$tmp" 2>/dev/null | tail -n 1)
+
+# Transcript desta sessão mexido há pouco: se ele tem resposta do modelo (fora as de erro) e nenhum registro de uso sai
+# dele, o formato mudou. A extração marca essas respostas com k=a.
+sessao_recente=0
+if [ -n "$sessao" ] && [ -d "$trans" ]; then
+  [ -n "$(find "$trans" -type f -name "$sessao.jsonl" -mmin -10 -print -quit 2>/dev/null)" ] && sessao_recente=1
+fi
 
 stlj=null
 if [ "${CLAUDE_CODE_ENTRYPOINT:-}" != claude-desktop ] && [ -r "$stl" ]; then
@@ -178,7 +271,8 @@ fi
 
 saida=$(env ${tz:+TZ="$tz"} jq -s -r \
   --argjson agora "$agora" --argjson pcl "$pcl" --argjson janela_env "$janela_env" --argjson inicio "$((agora - minutos * 60))" \
-  --arg sid "$sessao" --argjson cal "$calj" --argjson stl "$stlj" --arg calibrar "$calibrar" --argjson em "$em" --arg script "$0" '
+  --arg sid "$sessao" --argjson cal "$calj" --argjson stl "$stlj" --arg calibrar "$calibrar" --argjson em "$em" --arg script "$0" \
+  --argjson sessao_recente "$sessao_recente" '
   def mediana: sort | .[(length - 1) / 2 | floor];
   def fmt: if . >= 1000000 then "\((. / 100000 | floor) / 10) mi" else "\(. / 1000 | floor) mil" end | gsub("\\."; ",");
   def pct: (. * 10 + 1e-9 | floor) / 10;
@@ -197,7 +291,10 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
       end;
 
   (map(select(.k == "u")) | unique_by(.id) | map(. + {x: (.u[0] + .u[1] + .u[2]), y: .u[3]}) | sort_by(.ts)) as $us
-  | (map(select(.k == "h")) | map(.ts as $t | {ts: $t, r: (.t | reinicio($t))}) | map(select(.r != null))
+  | if $sessao_recente == 1 and (map(select(.k == "a")) | length) > 0 and ([$us[] | select(.s == 1)] | length) == 0 then
+      "formato", "o transcript desta sessão tem resposta do modelo e nenhum registro de uso que eu reconheça: o formato do Claude Code pode ter mudado, e a estimativa daria 0% em silêncio"
+    else
+  (map(select(.k == "h")) | map(.ts as $t | {ts: $t, r: (.t | reinicio($t))}) | map(select(.r != null))
      | group_by(.r) | map({r: .[0].r, hit: (map(.ts) | min)})) as $hits
 
   # Janelas em sequência; a de um aviso de limite manda sobre a estimada.
@@ -238,14 +335,28 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
                   + (if ($v | length) >= 3 and $m > 0 then ", dispersão \(($v | map((. - $m) * (. - $m)) | add / length | sqrt) / $m * 100 | floor)%" else "" end))}
      end) as $lim
 
-  # Contexto: o da última resposta do transcript desta sessão.
-  | (($cal.contexto_max // {}) as $antes
-     | reduce ($us[] | {m, c: (.u[0] + .u[2] + .u[3])}) as $e ($antes;
-         .[$e.m] = ([(.[$e.m] // 0), $e.c] | max))) as $ctxmax
-  | ($us | map(select(.s == 1 and (.sc | not))) | last) as $ult
+  # Contexto: o da última resposta do transcript desta sessão. A janela de 1 milhão se prova pela própria sessão acima de
+  # 200 mil; o histórico do modelo (última vez acima de 200 mil, por nome) só vale por 30 dias e sai marcado como deduzido.
+  | (($cal.contexto_1m // (($cal.contexto_max // {}) | with_entries(select(.value > 200000) | .value = ($cal.varrido_ate // $agora))))
+     | reduce ($us[] | select((.u[0] + .u[2] + .u[3]) > 200000) | {m, ts}) as $e (.; .[$e.m] = ([(.[$e.m] // 0), $e.ts] | max))
+     | with_entries(select(.value >= $agora - 2592000))) as $c1m
+  | ($us | map(select(.s == 1 and (.sc | not)))) as $dasessao
+  | ($dasessao | last) as $ult
   | (if $ult == null then null else ($ult.u[0] + $ult.u[2] + $ult.u[3]) end) as $ctx
-  | (if $janela_env > 0 then $janela_env
-     elif $ult != null and (($ctxmax[$ult.m] // 0) > 200000) then 1000000 else 200000 end) as $jan
+  | (if $janela_env > 0 then {n: $janela_env, f: "variavel"}
+     elif ($dasessao | map(.u[0] + .u[2] + .u[3]) | max // 0) > 200000 then {n: 1000000, f: "medida"}
+     elif $ult != null and $c1m[$ult.m] != null then {n: 1000000, f: "deduzida"}
+     else {n: 200000, f: "padrao"} end) as $janx
+  | $janx.n as $jan
+  # Recibo da leitura nova: a hora gravada, como desfazer e se o limite que ela dá foge dos outros pontos.
+  | (if $nova == null then null else
+      (($nova.x + $pcl * $nova.y) / ($nova.pct / 100)) as $ln
+      | ([$rec[] | select(.k != "u" or .t != $nova.em) | .l] | if length == 0 then null else mediana end) as $med
+      | "leitura gravada: \($nova.pct)% às \($nova.em | strflocaltime("%H:%M")) (para desfazer: orcamento-local.sh --descartar \($nova.em | todate))"
+        + (if $med != null and $med > 0 and ($ln / $med > 2 or $ln / $med < 0.5)
+           then "; ATENÇÃO: o limite que ela dá é \($ln / $med * 10 | floor | . / 10 | tostring | gsub("\\."; ","))× o dos outros pontos. Se o número foi digitado errado, descarte"
+           else "" end)
+     end) as $recibo
   | ($us | map(select(.s > 0)) | if length == 0 then null else map(.x + $pcl * .y) | add end) as $tsessao
   | ([$hits[] | select(.r > $agora)] | last) as $limitada
   | ([$leituras[] | select(.em >= $bloco.ini and .em <= $agora)] | last) as $anc
@@ -262,7 +373,7 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
   | {versao: 1, harness: "claude-code", fonte: $f.fonte, script: ($f.script // $script), gravado_em: $agora, sessao: $sid,
      cinco_horas: $f.c5, sete_dias: ($f.d7 // {usado: null, reinicia: null, visto_em: null}),
      contexto: {usado: (if $ctx == null then null else 100 * $ctx / $jan end), sessao: $sid, desta_sessao: ($ctx != null),
-                tokens: $ctx, janela: $jan},
+                tokens: $ctx, janela: $jan, janela_fonte: $janx.f},
      estimativa: {tokens: ($w | floor), limite: ($lim.limite // null | if . == null then null else floor end),
                   calibracao: ($lim.rotulo // null), peso_cache_leitura: $pcl, sessao_tokens: ($tsessao // null | if . == null then null else floor end)}} as $obj
 
@@ -273,13 +384,15 @@ saida=$(env ${tz:+TZ="$tz"} jq -s -r \
        elif $aberta and $anc != null then "âncora: /usage das \($anc.em | strflocaltime("%H:%M")) com \($anc.pct)%, mais ≈ \($depois | fmt) tokens ponderados desde então sobre \($lim.limite | fmt) (\($lim.rotulo))"
        else "estimado pelos transcripts: ≈ \($w | fmt) de \($lim.limite | fmt) tokens ponderados (\($lim.rotulo))" end),
       (if $ctx == null then "contexto não medido: \(if $sid == "" then "sem id de sessão" else "sessão sem resposta nos transcripts" end)"
-       else "contexto \($ctx | fmt) de \($jan | fmt)" end),
-      (if $tsessao == null then empty else "sessão ≈ \($tsessao | fmt) com subagentes" end)
+       else "contexto \($ctx | fmt) de \($jan | fmt)\(if $janx.f == "deduzida" then " (janela deduzida pelo histórico do modelo)" else "" end)" end),
+      (if $tsessao == null then empty else "sessão ≈ \($tsessao | fmt) com subagentes" end),
+      ($recibo // empty)
     ] | join(" · ")) as $nota
 
   | ($obj | tojson),
-    ({versao: 1, varrido_ate: $agora, pontos: $pontos, leituras: $leituras, contexto_max: $ctxmax} | tojson),
+    ({versao: 1, varrido_ate: $agora, pontos: $pontos, leituras: $leituras, contexto_1m: $c1m} | tojson),
     $nota
+    end
     end
 ' "$tmp" 2>/dev/null)
 rc_jq=$?
@@ -287,8 +400,12 @@ rc_jq=$?
 json="" calnovo="" nota=""
 { IFS= read -r json; IFS= read -r calnovo; IFS= read -r nota; } <<<"$saida"
 if [ "$json" = erro ]; then
-  echo "$calnovo" >&2
+  echo "$calnovo$avisos" >&2
   exit 2
+fi
+if [ "$json" = formato ]; then
+  echo "ORCAMENTO desligado — $calnovo · fonte transcripts$avisos"
+  exit 0
 fi
 if [ "$rc_jq" -ne 0 ] || [ -z "$json" ] || [ -z "$calnovo" ]; then
   echo "ORCAMENTO desligado — não consegui ler os transcripts em $trans (jq saiu com $rc_jq)"

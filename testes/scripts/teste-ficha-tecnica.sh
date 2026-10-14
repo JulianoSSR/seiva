@@ -141,6 +141,52 @@ roda "$P" --de "$P/relatorios/muitas.md"
 tem "teto de 400 linhas avisado" "$(cat "$P/trechos.md")" "teto de 400 linhas"
 eq "no máximo 400 linhas de trecho" 400 "$(grep -cE '^ *[0-9]+  ' "$P/trechos.md")"
 
+# --- citação que sai do repositório não é lida -----------------------------------------
+mkdir -p "$T/fora"
+printf 'conteudo_de_fora_falso_1\nconteudo_de_fora_falso_2\n' >"$T/fora/credencial.cfg"
+ln -sf "$T/fora/credencial.cfg" "$R/src/link.cfg"
+cat >"$P/relatorios/fora.md" <<FIM
+- ../fora/credencial.cfg:1
+- $T/fora/credencial.cfg:2
+- src/link.cfg:1
+- src/a.js:1
+FIM
+roda "$P" --de "$P/relatorios/fora.md"
+nao_tem "caminho com .. ou absoluto de fora: não entra no trecho" "$(cat "$P/trechos.md")" "conteudo_de_fora_falso"
+nao_tem "nem na ficha" "$(cat "$P"/fichas/*.md)" "conteudo_de_fora_falso"
+tem "a citação de fora é dita como pulada" "$SAI" "fora do repositório"
+tem "a citação de dentro continua" "$(cat "$P/trechos.md")" "## src/a.js:"
+rm -f "$R/src/link.cfg"
+
+# --- chave privada: corte no meio dela não deixa o corpo em claro nem engole o resto ------
+{
+  echo "-----BEGIN PRIVATE KEY-----"
+  for i in $(seq -w 1 25); do echo "MIIEcorpofalsodechave00$i"; done
+  echo "-----END PRIVATE KEY-----"
+  echo "depois_da_chave_1"
+} >"$R/src/k1.pem"
+cp "$R/src/k1.pem" "$R/src/k2.pem"
+printf 'texto_do_arquivo_seguinte\n' >"$R/src/z.txt"
+cat >"$P/relatorios/chave.md" <<'FIM'
+- src/k1.pem:20
+- src/k2.pem:1
+- src/z.txt:1
+FIM
+roda "$P" --de "$P/relatorios/chave.md"
+nao_tem "trecho que começa no meio da chave: corpo mascarado" "$(cat "$P/trechos.md")" "MIIEcorpofalso"
+tem "trecho com BEGIN sem o END dentro: o arquivo seguinte não some" "$(cat "$P/trechos.md")" "texto_do_arquivo_seguinte"
+tem "a linha depois do END continua" "$(cat "$P/trechos.md")" "depois_da_chave_1"
+eq "a numeração das linhas não muda" 1 "$(grep -cE '^ +28  depois_da_chave_1' "$P/trechos.md")"
+{
+  echo 'JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----'
+  echo 'MIIEcorpofalsodechaveNoScript'
+  echo '-----END PRIVATE KEY-----"'
+  echo '# TODO conferir depois da chave'
+} >"$R/src/com-chave.sh"
+roda "$P" src/com-chave.sh
+nao_tem "ficha de arquivo com chave: sem o corpo" "$(cat "$P/fichas/src__com-chave.sh.md")" "MIIEcorpofalso"
+tem "ficha de arquivo com chave: a linha-chave depois dela continua" "$(cat "$P/fichas/src__com-chave.sh.md")" "4:# TODO conferir depois da chave"
+
 if [ "$erros" -ne 0 ]; then
   echo "FALHA: $erros de $n casos"
   exit 1
