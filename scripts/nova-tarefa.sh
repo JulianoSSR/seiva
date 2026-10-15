@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cria a pasta de uma tarefa com registro, plano, achados, progresso e contexto a partir dos moldes da skill,
+# Cria a pasta de uma tarefa com registro, plano, achados, progresso, contexto e a 1ª marca de sessão (sessoes),
 # e grava no registro a foto do `git status` de agora: o que já estava mexido antes da
 # tarefa começar é de outra sessão, não desta.
 #
@@ -37,6 +37,12 @@ sed -e "s/{{SLUG}}/$slug/g" "$skill/moldes/plano.md" > "$destino/plano.md"
 sed -e "s/{{SLUG}}/$dia-$slug/g" "$skill/moldes/progresso.md" > "$destino/progresso.md"
 sed -e "s/{{SLUG}}/$dia-$slug/g" "$skill/moldes/contexto-tarefa.md" > "$destino/contexto-tarefa.md"
 printf '# Achados — %s\n' "$slug" > "$destino/achados.md"
+
+# 1ª marca de sessão: o medir.sh conta o orquestrador a partir dela. Sem o id da sessão, a 1ª marca vem do
+# orcamento-local.sh --tarefa, na 1ª leva.
+sid=${CLAUDE_CODE_SESSION_ID:-}
+sid=${sid//[^A-Za-z0-9._-]/}
+[ -z "$sid" ] || printf '%s %s\n' "$(date +%s)" "$sid" > "$destino/sessoes"
 
 {
   echo

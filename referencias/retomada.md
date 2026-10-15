@@ -14,7 +14,7 @@ O `registro.md` continua sendo o histórico da tarefa (triagem, decisões, agent
 | Momento | O que fazer |
 |---|---|
 | Fechou uma etapa | `progresso.sh <pasta> marcar <n> feita <artefatos>`; reescreva o `contexto-tarefa.md` |
-| Antes de cada leva | `orcamento-local.sh --tarefa <pasta>`; grave o pacote de cada agente em `relatorios/pacote-<papel>-r<n>.md`; atualize só a Próxima ação: quem vai ser disparado e o relatório que cada um deve deixar |
+| Antes de cada leva | `orcamento-local.sh --tarefa <pasta> --leva "<papel>:<modelo> ..."`; grave o pacote de cada agente em `relatorios/pacote-<papel>-r<n>.md`; atualize só a Próxima ação: quem vai ser disparado e o relatório que cada um deve deixar |
 | Rodada nova num portão | `progresso.sh <pasta> marcar <n> "em-curso: rodada 2/2"` |
 | Parada limpa | os dois arquivos em dia e uma linha na seção Retomada do `registro.md` |
 

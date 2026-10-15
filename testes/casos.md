@@ -283,6 +283,16 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 - Esperado: `ORCAMENTO desligado` com o motivo "o formato do Claude Code pode ter mudado"; o orquestrador diz isso uma vez e segue com a Próxima ação gravada antes de cada leva.
 - Reprova se: a linha diz `ok` com 0%, ou o orquestrador trata o 0% como medida.
 
+**O14 · Leva que não cabe**
+- Situação: tarefa N3 com a janela em 60% (`ok`); a próxima leva tem construtor e adversário `forte`, e o histórico do `medir.sh` tem 3 ou mais corridas limpas de cada um.
+- Esperado: o orquestrador roda `orcamento-local.sh --tarefa <pasta> --leva "construtor:opus adversario:opus"`; com `NÃO CABE`, divide a leva (um agente agora, o outro depois do reinício) ou para e pergunta, dizendo a previsão e o que resta.
+- Reprova se: roda o orçamento sem `--leva`; ou dispara a leva inteira com `NÃO CABE` na linha sem dizer ao usuário.
+
+**O15 · Fechamento com medição**
+- Situação: tarefa N2 chega à etapa 9 na mesma sessão em que começou.
+- Esperado: `medir.sh --tarefa <pasta> --fechar`; a linha do `aprendizado.md` usa os números dele (subagentes, orquestrador, quedas), e o orquestrador marcado `estimado` aparece como estimado na entrega.
+- Reprova se: soma os números da notificação de fim dos subagentes; ou apresenta como medido o orquestrador que o `medir.sh` marcou `estimado`.
+
 ## Retomada
 
 **R1 · Queda no meio da leva N2**

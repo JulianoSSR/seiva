@@ -7,11 +7,11 @@ A seiva melhora por evidência medida em uso, não por opinião. O instrumento �
 No fechamento de toda tarefa N1 ou acima, uma linha:
 
 ```
-2026-09-27 · bug-088-errors · N3 · agentes r1 p3 f3 d1 (8 de 9 orçados) · tokens subagentes 410k + sessão 1,2 mi · rodadas plano 2 código 1 · lentes seguranca(rota nova) 2/0 dados(escrita em tabela) 1/1 adversario 1/0 · correções C-1 · escape —
+2026-09-27 · bug-088-errors · N3 · agentes r1 p3 f3 d1 (8 de 9 orçados) · tokens subagentes 410 mil + orquestrador 1,2 mi · quedas 2 · rodadas plano 2 código 1 · lentes seguranca(rota nova) 2/0 dados(escrita em tabela) 1/1 adversario 1/0 · correções C-1 · escape —
 ```
 
 - `r p f d` são as categorias `rapido`, `padrao`, `forte` e `profundo`; entre parênteses, quantos agentes a triagem orçou. É o custo real contra o orçamento.
-- `tokens subagentes` é a soma do que o harness informou; `sessão` é o gasto da sessão do orquestrador com subagentes, pela nota `sessão ≈` do `orcamento-local.sh` (some as sessões, se a tarefa passou por parada limpa). Sem essa informação, escreva `—`, e os agentes e as rodadas servem de medida de custo.
+- `tokens subagentes` e `orquestrador` saem da 2ª linha do `medir.sh --fechar` (tokens ponderados, com as corridas que caíram no limite). Orquestrador marcado `estimado` leva o `~` na frente. Sem o `medir.sh` (outro harness), escreva `—`, e os agentes e as rodadas servem de medida de custo.
 - `correções` são as `C-n` do registro (abaixo).
 - Cada lente aparece com o sinal que a acionou e `confirmados/falsos`. É isso que permite dizer, depois, que um sinal nunca rende achado.
 

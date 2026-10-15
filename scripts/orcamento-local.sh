@@ -4,9 +4,16 @@
 # Grava o resultado no formato do orcamento.json, com o campo "fonte", e passa a decisão ao scripts/orcamento.sh, que
 # continua sendo o único que decide entre ok, restrito e parar. Não precisa de statusline, de hook nem de terminal.
 #
-# Uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct> [--em <hora>] | --calibrar auto]
+# Uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--leva "<papel>:<modelo> ..."]
+#                          [--calibrar <pct> [--em <hora>] | --calibrar auto]
 #      orcamento-local.sh --leituras | --descartar <hora|ultima>
-#   --tarefa          repassado ao orcamento.sh, que grava o "retomar" da barra
+#   --tarefa          repassado ao orcamento.sh, que grava o "retomar" da barra. Também marca a sessão em
+#                     <pasta>/sessoes ("<epoch> <sessão>"): é por essas marcas que o medir.sh separa a parte do
+#                     orquestrador
+#   --leva            os agentes da próxima leva, um item por agente (ex.: "construtor:opus adversario:opus lente:sonnet").
+#                     A linha ganha a previsão de custo da leva, pela mediana das corridas limpas (sem queda e sem
+#                     retomada) do histórico que o medir.sh grava, e se ela cabe no que resta da janela de 5 horas.
+#                     Item com menos de 3 corridas limpas fica fora da soma, e a linha diz qual
 #   --sessao          a sessão cujo contexto se mede. Padrão: $CLAUDE_CODE_SESSION_ID (o app desktop define; medido em
 #                     2026-10-13). Sem ela, o transcript mais recente da pasta do projeto, com o aviso "sessão deduzida"
 #   --calibrar <pct>  leitura do /usage (ou da página de uso do claude.ai): <pct> é o uso da janela de 5 horas que
@@ -49,19 +56,21 @@ set -uo pipefail
 export LC_ALL=C
 umask 077
 
-uso() { echo "uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--calibrar <pct> [--em <hora>] | --calibrar auto] | --leituras | --descartar <hora|ultima>" >&2; exit 2; }
+uso() { echo "uso: orcamento-local.sh [--tarefa <pasta-da-tarefa>] [--sessao <id>] [--leva \"<papel>:<modelo> ...\"] [--calibrar <pct> [--em <hora>] | --calibrar auto] | --leituras | --descartar <hora|ultima>" >&2; exit 2; }
 # Epoch ou ISO em UTC (fração de segundo aceita) para epoch; vazio se não der.
 epoch_de() { case $1 in *[!0-9]*) jq -nr --arg t "$1" '$t | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601' 2>/dev/null ;; *) printf '%s\n' "$1" ;; esac; }
 
 tarefa=""
 sessao=""
+deduzida=""
 calibrar=""
 em=""
 leituras=0
 descartar=""
+leva=""
 while [ "$#" -gt 0 ]; do
   case $1 in
-    --tarefa | --sessao | --calibrar | --em | --descartar)
+    --tarefa | --sessao | --calibrar | --em | --descartar | --leva)
       [ "$#" -ge 2 ] && [ -n "$2" ] || uso
       case $1 in
         --tarefa) tarefa=$2 ;;
@@ -69,6 +78,7 @@ while [ "$#" -gt 0 ]; do
         --calibrar) calibrar=$2 ;;
         --em) em=$2 ;;
         --descartar) descartar=$2 ;;
+        --leva) leva=$2 ;;
       esac
       shift 2
       ;;
@@ -94,6 +104,21 @@ case $calibrar in
       { echo "--calibrar: o percentual vai de 10 a 100 (abaixo de 10, o erro da conta fica grande demais)" >&2; exit 2; }
     ;;
 esac
+
+# --leva: papel conhecido e família de modelo, para a previsão não errar em silêncio por um nome digitado errado.
+if [ -n "$leva" ]; then
+  read -r -a itens <<<"$leva"
+  [ "${#itens[@]}" -gt 0 ] || uso
+  for item in "${itens[@]}"; do
+    case ${item%%:*} in
+      batedor | construtor | adversario | lente | implementador | verificador | invasor | revisor) ;;
+      *) echo "--leva: cada item é <papel>:<modelo>; papéis: batedor construtor adversario lente implementador verificador invasor revisor (veio '$item')" >&2; exit 2 ;;
+    esac
+    case ${item#*:} in
+      "$item" | '' | *[!a-z0-9.-]*) echo "--leva: modelo inválido em '$item' (use a família: opus, sonnet, haiku, fable)" >&2; exit 2 ;;
+    esac
+  done
+fi
 
 if [ -n "$em" ]; then
   case $calibrar in '' | auto) echo "--em só vale com --calibrar <pct>" >&2; exit 2 ;; esac
@@ -155,8 +180,15 @@ if [ -z "$sessao" ] && [ -d "$trans" ]; then
     sessao=${ultimo##*/}
     sessao=${sessao%.jsonl}
     sessao=${sessao//[^A-Za-z0-9._-]/}
+    deduzida=1
     avisos+=" · sessão deduzida pelo transcript mais recente do projeto"
   fi
+fi
+
+# Marca da sessão na pasta da tarefa: o medir.sh conta o orquestrador da 1ª à última marca de cada sessão.
+if [ -n "$tarefa" ] && [ -n "$sessao" ] && [ -d "$tarefa" ]; then
+  printf '%s %s%s\n' "$agora" "$sessao" "${deduzida:+ deduzida}" >>"$tarefa/sessoes" 2>/dev/null ||
+    avisos+=" · não consegui marcar a sessão em $tarefa/sessoes"
 fi
 
 # Calibração: só a forma conhecida entra. A 1.2.0 gravava uma leitura só, em "manual"; ela vira a 1ª leitura.
@@ -429,5 +461,31 @@ args=()
 [ -n "$tarefa" ] && args+=(--tarefa "$tarefa")
 linha=$(bash "$lei" ${args[@]+"${args[@]}"} "$arq")
 rc=$?
+
+# --leva: previsão pelo histórico do medir.sh (custos.jsonl), contra o que resta da janela pelo estado que acabou de sair.
+if [ -n "$leva" ]; then
+  custos=$dir/custos.jsonl
+  [ -r "$custos" ] || custos=/dev/null
+  prev=$(jq -nr --slurpfile st "$arq" --rawfile h "$custos" --arg leva "$leva" '
+    def fmt: if . >= 1000000 then "\((. / 100000 | floor) / 10) mi" else "\(. / 1000 | floor) mil" end | gsub("\\."; ",");
+    def mediana: sort | .[length / 2 | floor];
+    ($h | split("\n") | map(fromjson? // empty | select(type == "object" and (.ponderado | type) == "number"))) as $hist
+    | [$leva | splits(" +") | select(length > 0) | {k: ., p: split(":")[0], m: split(":")[1]}] as $itens
+    | [$itens[] as $i
+        | [$hist[] | select(.papel == $i.p and .modelo == $i.m and .quedas == 0 and .corridas == 1) | .ponderado] as $v
+        | $i + {n: ($v | length), c: (if ($v | length) >= 3 then ($v | mediana) else null end)}] as $prev
+    | ($prev | map(.c // 0) | add) as $soma
+    | ($prev | map(select(.c != null)) | unique_by(.k) | map("\(.k) \(.c | fmt)") | join(", ")) as $cada
+    | ($prev | map(select(.c == null) | .k) | unique) as $sem
+    | $st[0].cinco_horas.usado as $u | $st[0].estimativa.limite as $l
+    | (if ($u | type) == "number" and ($l | type) == "number" and $l > 0 then ([100 - $u, 0] | max) / 100 * $l else null end) as $resta
+    | "leva ≈ \($soma | fmt)"
+      + (if $cada == "" then "" else " (\($cada), mediana das corridas limpas)" end)
+      + (if ($sem | length) > 0 then ", sem contar \($sem | join(", ")): menos de 3 corridas limpas no histórico" else "" end)
+      + " · resta ≈ " + (if $resta == null then "? (sem calibração)" else ($resta | fmt) end)
+      + (if $resta == null then "" elif $soma > $resta then ": NÃO CABE" elif ($sem | length) > 0 then ": a parte conhecida cabe" else ": cabe" end)
+  ' 2>/dev/null) || prev="leva: não consegui ler o histórico em $custos"
+  nota+=" · $prev"
+fi
 printf '%s · %s%s\n' "$linha" "$nota" "$avisos"
 exit "$rc"

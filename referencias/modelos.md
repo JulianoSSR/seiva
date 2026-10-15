@@ -23,7 +23,7 @@ O orquestrador é o modelo da sessão. Se a sessão está num modelo pequeno e a
 4. **Voltas custam mais que preço.** Se o `rapido` precisaria de um passo a passo longo demais para acertar, use o `padrao`.
 5. **Modelo pequeno pede prompt explícito:** passos numerados, critério de pronto, o que não fazer e formato de saída.
 6. **Independência declarada.** Da mais forte para a mais fraca: `outro-provedor`, `outro-modelo`, `mesmo-modelo-contexto-limpo`, `mesmo-contexto`. Toda revisão registra qual teve.
-7. **Tokens:** quando o harness informa os tokens de cada subagente (o Claude Code informa na notificação de fim), anote no registro. No fechamento, some e acrescente o gasto da sessão do orquestrador (`sessão ≈` na linha do `orcamento-local.sh`). É o dado que compara o custo real com o orçamento da triagem.
+7. **Tokens:** o custo de cada subagente e do orquestrador vem do `scripts/medir.sh`, que lê os transcripts com a régua do orçamento e conta as corridas que caíram no limite ([harness](harness.md#medição-da-tarefa)). O número que o Claude Code informa na notificação de fim é só o da última corrida, sem a leitura de cache: na tarefa de logs do ciclo-arboris (2026-10-05), um construtor informou 269 mil e gastou 1,10 mi, porque duas corridas caíram antes da que fechou. É o dado que compara o custo real com o orçamento da triagem, e o histórico dele prevê o custo da próxima leva.
 
 ## Modelo indisponível
 

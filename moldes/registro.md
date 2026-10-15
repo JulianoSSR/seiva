@@ -18,6 +18,7 @@
 <!-- C-1: correção do usuário: o que a seiva fez → o que ele corrigiu (referencias/evolucao.md) -->
 
 ## Agentes
+<!-- Tokens: o que a notificação de fim informou, só para conferência. O custo que vale está no medicao.md (scripts/medir.sh). -->
 | # | Etapa | Papel | Categoria | Modelo | Tokens | Status | Relatório |
 |---|---|---|---|---|---|---|---|
 

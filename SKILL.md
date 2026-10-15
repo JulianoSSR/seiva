@@ -11,7 +11,7 @@ description: |
 license: MIT
 compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo, enxugar, fichas e pré-julgamento usam jq, sed GNU e timeout.
 metadata:
-  version: "1.2.3"
+  version: "1.3.0"
 ---
 
 # Seiva
@@ -113,7 +113,7 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Atualize o status nos registros que o perfil manda (seção R), no mesmo trabalho. Número de item novo (bug, incidente, decisão) segue a regra de numeração da seção R; sem regra, confira o maior número em uso no arquivo como está agora, nunca pelo histórico do git, porque outra sessão pode ter acabado de usar o próximo.
 - Entregue pelas regras do projeto (seção E), por exemplo: bloco de commit para o usuário rodar, se o projeto proíbe o agente de commitar.
 - A entrega diz: o que mudou; a prova; decisões tomadas sem o usuário (`D-n`, com custo se errado); limitações e suposições; achados não corrigidos e onde ficaram registrados; categorias rebaixadas por indisponibilidade; a independência de cada revisão.
-- Preencha "Arquivos entregues" no registro e anote uma linha em `aprendizado.md` ([evolução](referencias/evolucao.md)).
+- Rode `scripts/medir.sh --tarefa <pasta> --fechar` na sessão do orquestrador: ele grava o `medicao.md` na pasta e alimenta o histórico de custo que o `--leva` usa. Preencha "Arquivos entregues" no registro e anote uma linha em `aprendizado.md` com os números dele ([evolução](referencias/evolucao.md)).
 
 ## Orquestrador enxuto
 
@@ -121,8 +121,8 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Confere prova por amostra: abre o `arquivo:linha` citado ou roda de novo o comando mais barato.
 - Cada subagente recebe o pacote de ida e nada mais. Pacote para modelo pequeno leva passos numerados.
 - Saída longa de comando passa por `scripts/enxugar.sh`; relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
-- Anote no registro os tokens de cada subagente (o Claude Code informa na notificação de fim) e, no fechamento, o total da tarefa com o da sessão do orquestrador. Orçamento da triagem estourado: avise antes de continuar.
-- Antes de cada leva, rode `scripts/orcamento-local.sh --tarefa <pasta>`, que lê os transcripts do Claude Code e funciona no terminal e no app desktop ([harness](referencias/harness.md)). `restrito` (70% da janela de 5 horas, estimado): só N0 e N1 seguem, e o nível não desce por isso. `parar` (85%, limite batido, ou contexto desta sessão em 70%): parada limpa. `desligado` ou `sem-dado`: diga uma vez o motivo que a linha traz e siga, com a Próxima ação gravada antes de cada leva.
+- Custo é medido, não copiado: `scripts/medir.sh --tarefa <pasta>` mede cada subagente e o orquestrador pelos transcripts, com as corridas que caíram no limite. O número da notificação de fim do subagente perde a leitura de cache e as corridas que caíram: não compare custo por ele. Na descrição de cada agente (campo `description` do Agent), comece pelo papel (`Construtor: ...`): é por ela que a medição separa os papéis. Orçamento da triagem estourado: avise antes de continuar.
+- Antes de cada leva, rode `scripts/orcamento-local.sh --tarefa <pasta> --leva "<papel>:<modelo> ..."`, um item por agente da leva (`construtor:opus adversario:opus lente:sonnet`). Ele lê os transcripts do Claude Code e funciona no terminal e no app desktop ([harness](referencias/harness.md)). Com `NÃO CABE` na linha, divida a leva ou espere o reinício da janela: agente que cai no limite no meio custa o que gastou e mais a retomada. `restrito` (70% da janela de 5 horas, estimado): só N0 e N1 seguem, e o nível não desce por isso. `parar` (85%, limite batido, ou contexto desta sessão em 70%): parada limpa. `desligado` ou `sem-dado`: diga uma vez o motivo que a linha traz e siga, com a Próxima ação gravada antes de cada leva.
 - Ao fechar cada etapa, `scripts/progresso.sh <pasta> marcar <n> feita <artefatos>` e o `contexto-tarefa.md` reescrito; antes de cada leva, só a Próxima ação dele. Ao esperar o usuário com contexto acima de 200 mil, avise que voltar depois de 1 hora recria o cache inteiro. Parada limpa, sessão nova e volta de pausa: [retomada](referencias/retomada.md).
 
 ## Quando parar e perguntar

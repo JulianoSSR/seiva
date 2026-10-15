@@ -1,5 +1,23 @@
 # Registro de mudanças
 
+## 1.3.0 (2026-10-14)
+
+Custo medido pelos transcripts, e um histórico que prevê o custo da próxima leva e melhora a cada tarefa medida.
+
+- `medir.sh` (novo): mede uma tarefa pelos transcripts do Claude Code, com a régua do orçamento. Cada subagente é atribuído à tarefa pelo pacote, que cita a pasta. A parte do orquestrador é a sessão entre a 1ª e a última marca da tarefa. Quando a sessão serviu a outra tarefa, essa parte é dividida e sai `estimado`. Conta corridas (pacote e retomadas) e quedas (erros da API). Grava `<pasta>/medicao.md` e o histórico `custos.jsonl` no cache, em modo 600 e sem texto: nem descrição, nem nome de tarefa, nem caminho. Tarefa de antes desta versão é medida com `--sessao <id>`, e sem sessão o script lista as candidatas do projeto. Motivo, medido em duas tarefas reais do ciclo-arboris: o número da notificação de fim do subagente perde a leitura de cache e as corridas que caíram no limite. Um construtor informou 269 mil e gastou 1,10 mi. Na tarefa do ponto eletrônico, 2,74 mi (21% da sessão) foram de agentes que caíram no limite e não apareciam em número nenhum do registro.
+- `orcamento-local.sh --leva "<papel>:<modelo> ..."`: prevê o custo da leva pela mediana das corridas limpas (sem queda e sem retomada) de cada papel e modelo no histórico, e diz se ela cabe no que resta da janela de 5 horas (`cabe`, `NÃO CABE` ou `a parte conhecida cabe`). Item com menos de 3 corridas limpas fica fora da soma, com o nome. O código de saída continua sendo o do `orcamento.sh`. Papel ou modelo fora do padrão é uso errado, para a previsão não falhar em silêncio por um nome digitado errado.
+- Marcas de sessão em `<pasta>/sessoes`: o `nova-tarefa.sh` (com `CLAUDE_CODE_SESSION_ID`), o `orcamento-local.sh --tarefa` a cada leva e o `medir.sh --fechar` no fechamento.
+- SKILL.md: a etapa 9 roda `medir.sh --fechar`; antes de cada leva vai `--leva`, e com `NÃO CABE` a leva é dividida; a descrição de cada agente começa pelo papel. `modelos.md`, `evolucao.md` (a linha do aprendizado usa os números do `medir.sh`), `retomada.md`, `harness.md` (seção "Medição da tarefa", com os limites) e o molde do registro (a coluna Tokens vira só conferência).
+- Testes: `teste-medir.sh` (56 casos, novo) e 16 casos novos no `teste-orcamento-local.sh` (144). Casos de uso O14 (leva que não cabe) e O15 (fechamento com medição).
+
+Limites, também em `harness.md`:
+- cada instalação aprende só com o próprio uso. Não há troca de histórico entre usuários, porque isso exigiria mandar dado para fora da máquina;
+- a previsão é a mediana do papel, não da tarefa: freio para não abrir leva que não cabe, não orçamento exato;
+- a régua pesa todos os modelos igual. O histórico guarda entrada e leitura de cache separadas para que o peso por modelo possa ser medido depois;
+- a retomada de um agente é reconhecida por não começar com tag, e o lembrete do harness começa com uma. Se o formato do Claude Code mudar, a contagem de corridas erra;
+- no orquestrador, entra tudo o que a sessão fez entre as marcas, até pergunta do usuário fora da tarefa;
+- feito sem revisor independente (a janela de 5 horas estava em 82% quando o escopo foi aprovado); revisão Sonnet pendente.
+
 ## 1.2.3 (2026-10-14)
 
 Correções da 1ª revisão independente dos scripts da 1.2.0 à 1.2.2 (diff `96f8523^..e2a5bbb`, lentes contrato, operação e segurança): 15 itens, 2 ALTO e 7 MÉDIO confirmados, 4 BAIXO ou incertos, 2 falsos. Todos os confirmados e os adiados entraram.

@@ -460,6 +460,53 @@ if command -v flock >/dev/null 2>&1; then
   tem "trava sem permissão: avisa que seguiu sem trava" "$SAI" "sem trava nesta execução"
 fi
 
+# --- --tarefa marca a sessão na pasta da tarefa ------------------------------------------
+novo
+u "$M" a 60 100000 0 0 0
+mkdir -p "$T/tarefa-marca"
+roda --sessao "$SID" --tarefa "$T/tarefa-marca"
+tem "--tarefa: marca a sessão" "$(cat "$T/tarefa-marca/sessoes" 2>/dev/null)" " $SID"
+roda --sessao "$SID" --tarefa "$T/tarefa-marca"
+eq "--tarefa: uma marca por execução" 2 "$(wc -l <"$T/tarefa-marca/sessoes")"
+roda --sessao "$SID" --tarefa "$T/nao-existe"
+eq "--tarefa que não existe: não cria a pasta" no "$([ -e "$T/nao-existe" ] && echo sim || echo no)"
+
+# --- --leva: previsão pelo histórico do medir.sh, contra o que resta da janela ---------
+novo
+u "$M" a 60 100000 0 0 0
+mkdir -p "$T/c/seiva"
+{
+  for p in 100000 200000 300000; do printf '{"v":1,"agente":"c%s","papel":"construtor","modelo":"opus","ponderado":%s,"quedas":0,"corridas":1}\n' "$p" "$p"; done
+  printf '{"v":1,"agente":"cq","papel":"construtor","modelo":"opus","ponderado":900000,"quedas":1,"corridas":1}\n'
+  printf '{"v":1,"agente":"cr","papel":"construtor","modelo":"opus","ponderado":900000,"quedas":0,"corridas":2}\n'
+  for p in 1 2 3; do printf '{"v":1,"agente":"b%s","papel":"batedor","modelo":"haiku","ponderado":10000,"quedas":0,"corridas":1}\n' "$p"; done
+  printf 'linha ilegível\n'
+} >"$T/c/seiva/custos.jsonl"
+roda --sessao "$SID" --leva "construtor:opus"
+tem "--leva sem calibração: não sabe quanto resta" "$SAI" "resta ≈ ? (sem calibração)"
+roda --sessao "$SID" --calibrar 50
+roda --sessao "$SID" --leva "construtor:opus"
+tem "--leva: mediana só das corridas limpas (sem queda, sem retomada)" "$SAI" "leva ≈ 200 mil (construtor:opus 200 mil, mediana das corridas limpas)"
+tem "--leva: maior que o que resta (50% de 200 mil)" "$SAI" "resta ≈ 100 mil: NÃO CABE"
+eq "--leva: o código continua o do orcamento.sh" 0 "$RC"
+roda --sessao "$SID" --leva "batedor:haiku batedor:haiku"
+tem "--leva: agentes iguais somam" "$SAI" "leva ≈ 20 mil (batedor:haiku 10 mil"
+tem "--leva: cabe" "$SAI" "resta ≈ 100 mil: cabe"
+roda --sessao "$SID" --leva "batedor:haiku lente:sonnet"
+tem "--leva: item sem histórico fica fora da soma, com o nome" "$SAI" "sem contar lente:sonnet: menos de 3 corridas limpas no histórico"
+tem "--leva: só a parte conhecida cabe" "$SAI" ": a parte conhecida cabe"
+roda --sessao "$SID" --leva "advers:opus"
+eq "--leva com papel desconhecido: uso errado" 2 "$RC"
+roda --sessao "$SID" --leva "lente"
+eq "--leva sem modelo: uso errado" 2 "$RC"
+roda --sessao "$SID" --leva "lente:Opus"
+eq "--leva com modelo fora do padrão: uso errado" 2 "$RC"
+roda --sessao "$SID" --leva "   "
+eq "--leva vazio: uso errado" 2 "$RC"
+rm -f "$T/c/seiva/custos.jsonl"
+roda --sessao "$SID" --leva "construtor:opus"
+tem "--leva sem histórico nenhum: diz qual ficou fora" "$SAI" "leva ≈ 0 mil, sem contar construtor:opus"
+
 # --- sem jq: desligado --------------------------------------------------------------
 novo
 mkdir -p "$T/bin"
