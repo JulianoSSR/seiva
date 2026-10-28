@@ -11,7 +11,7 @@ description: |
 license: MIT
 compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo, enxugar, fichas e pré-julgamento usam jq, sed GNU e timeout.
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Seiva
@@ -57,7 +57,7 @@ Os níveis estão em [triagem](referencias/triagem.md). Na dúvida entre dois, u
 1. Confirme que o repositório é o vivo. **Antes** dos comandos, releia o que as instruções do projeto e a memória da sessão dizem sobre onde ele fica. Depois rode `git rev-parse --show-toplevel`, `git log -1 --format='%h %cs %s'` e `git status --short`. Pare e avise se o caminho diverge do que a memória cita, ou se o último commit é antigo demais para o que se sabe do projeto. Um repositório git válido não prova que é o certo. Git recusando por "dubious ownership": veja [terreno](referencias/terreno.md), sem mexer na configuração global.
 2. Pasta de trabalho: `.claude/seiva/` quando o git já ignora `.claude/`; senão `.seiva/`, e pergunte ao usuário se ela deve ser ignorada ou versionada.
 3. Perfil: se `perfil.md` existe, rode `scripts/impressao.sh` sobre as fontes listadas nele. Impressões iguais: use o perfil como está. Diferentes: refaça só as seções da fonte que mudou. Sem perfil: crie seguindo [terreno](referencias/terreno.md). Na criação, e sempre que uma atualização mudar as seções L, P, V ou E, mostre ao usuário o que mudou antes de usar. Um erro no perfil se propaga para todos os agentes.
-4. Tarefa em curso: com "retome <caminho>", com "continue" ou "tentar novamente", ou numa sessão que voltou de pausa por limite de uso, siga [retomada](referencias/retomada.md) sem esperar pedido: `scripts/progresso.sh <pasta> pendentes`, depois só o `contexto-tarefa.md` e o `conferir`. Etapa feita não roda de novo.
+4. Tarefa em curso: com "retome <caminho>", com "continue" ou "tentar novamente", ou numa sessão que voltou de pausa por limite de uso, siga [retomada](referencias/retomada.md) sem esperar pedido: `scripts/progresso.sh <pasta-de-trabalho> pendentes`, depois só o `contexto-tarefa.md` e o `conferir`. Etapa feita não roda de novo.
 
 ### 1 · Triagem
 
@@ -123,7 +123,7 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Saída longa de comando passa por `scripts/enxugar.sh`; relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
 - Custo é medido, não copiado: `scripts/medir.sh --tarefa <pasta>` mede cada subagente e o orquestrador pelos transcripts, com as corridas que caíram no limite. O número da notificação de fim do subagente perde a leitura de cache e as corridas que caíram: não compare custo por ele. Na descrição de cada agente (campo `description` do Agent), comece pelo papel (`Construtor: ...`): é por ela que a medição separa os papéis. Orçamento da triagem estourado: avise antes de continuar.
 - Antes de cada leva, rode `scripts/orcamento-local.sh --tarefa <pasta> --leva "<papel>:<modelo> ..."`, um item por agente da leva (`construtor:opus adversario:opus lente:sonnet`). Ele lê os transcripts do Claude Code e funciona no terminal e no app desktop ([harness](referencias/harness.md)). Com `NÃO CABE` na linha, divida a leva ou espere o reinício da janela: agente que cai no limite no meio custa o que gastou e mais a retomada. `restrito` (70% da janela de 5 horas, estimado): só N0 e N1 seguem, e o nível não desce por isso. `parar` (85%, limite batido, ou contexto desta sessão em 70%): parada limpa. `desligado` ou `sem-dado`: diga uma vez o motivo que a linha traz e siga, com a Próxima ação gravada antes de cada leva.
-- Ao fechar cada etapa, `scripts/progresso.sh <pasta> marcar <n> feita <artefatos>` e o `contexto-tarefa.md` reescrito; antes de cada leva, só a Próxima ação dele. Ao esperar o usuário com contexto acima de 200 mil, avise que voltar depois de 1 hora recria o cache inteiro. Parada limpa, sessão nova e volta de pausa: [retomada](referencias/retomada.md).
+- Ao fechar cada etapa, `scripts/progresso.sh <pasta-da-tarefa> marcar <n> feita <artefatos>` e o `contexto-tarefa.md` reescrito; antes de cada leva, só a Próxima ação dele. Ao esperar o usuário com contexto acima de 200 mil, avise que voltar depois de 1 hora recria o cache inteiro. Parada limpa, sessão nova e volta de pausa: [retomada](referencias/retomada.md).
 
 ## Quando parar e perguntar
 

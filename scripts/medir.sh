@@ -4,37 +4,56 @@
 # de cache + PESO_CACHE_LEITURA × leitura de cache, contada uma vez (a chave é message.id + requestId).
 #
 # Uso: medir.sh --tarefa <pasta-da-tarefa> [--sessao <id>]... [--fechar]
-#   --tarefa   a pasta criada pelo nova-tarefa.sh
-#   --sessao   sessão do orquestrador medida inteira, além das marcadas em <pasta>/sessoes. Serve para tarefa de antes
-#              da 1.3.0, que não tem marca. Pode repetir
+#   --tarefa   a pasta da tarefa, <trabalho>/tarefas/<tarefa>, criada pelo nova-tarefa.sh. A pasta de trabalho (a que
+#              tem tarefas/) e a própria tarefas/ (com subpasta de registro.md ou progresso.md) são recusadas com código
+#              2, antes de gravar qualquer coisa: nem sessoes, nem medicao.md, nem histórico
+#   --sessao   sessão do orquestrador medida inteira, do começo ao fim, além das marcadas em <pasta>/sessoes. Vale
+#              mesmo que a sessão tenha marca lá: a marca dela é ignorada (as das outras sessões continuam valendo) e a
+#              saída diz isso. Serve para tarefa de antes da 1.3.0, que não tem marca, e para sessão de janela vazia
+#              (uma marca só). Pode repetir
 #   --fechar   marca a sessão atual ($CLAUDE_CODE_SESSION_ID) em <pasta>/sessoes antes de medir: é o fim da parte do
 #              orquestrador. Use no fechamento, na sessão do orquestrador
 #
 # De onde vem cada parte:
 #   - subagentes: os das sessões da tarefa cujo pacote (a 1ª mensagem que o agente recebe) cita o nome da pasta da
-#     tarefa. Atribuição exata. Os que não citam ficam fora da conta e saem contados como "de outra tarefa";
+#     tarefa inteiro: no começo do texto ou depois de caractere fora de [A-Za-z0-9_-], e no fim do texto ou antes de
+#     um. Assim 2026-10-01-x-2 não conta para 2026-10-01-x, e "2026-10-01-x." e (2026-10-01-x) contam. Os que não
+#     citam ficam fora da conta e saem contados como "de outra tarefa";
 #   - orquestrador: em cada sessão, as respostas entre a 1ª e a última marca desta tarefa em <pasta>/sessoes. Marcam o
-#     nova-tarefa.sh, o orcamento-local.sh --tarefa (a cada leva) e o medir.sh --fechar. Sessão sem marca, passada por
-#     --sessao, conta inteira. Se outra tarefa marcou a mesma sessão nesse intervalo, ou se a sessão tem subagente que
-#     não é desta tarefa, a parte do orquestrador é dividida pela proporção do gasto dos subagentes (em partes iguais,
-#     quando só esta tarefa teve subagente no intervalo) e sai "estimado";
+#     nova-tarefa.sh, o orcamento-local.sh --tarefa (a cada leva) e o medir.sh --fechar. Sessão passada por --sessao
+#     conta inteira, com marca ou sem. Sessão com uma marca só (ou várias no mesmo segundo) tem janela vazia: nada é
+#     contado e a saída avisa, com o número do orquestrador sendo só o das sessões que têm janela (um piso). Se outra
+#     tarefa marcou a mesma sessão nesse intervalo, ou se a sessão tem subagente que não é desta tarefa, a parte do
+#     orquestrador é dividida pela proporção do gasto dos subagentes (em partes iguais, quando só esta tarefa teve
+#     subagente no intervalo) e sai "estimado";
 #   - quedas: respostas de erro da API no transcript do agente (limite de uso, sobrecarga); corridas: mensagens que o
 #     agente recebeu do orquestrador (a 1ª é o pacote; as outras, retomadas).
 #
-# Saída: de 3 a 7 linhas, a 1ª começando por MEDICAO. Grava <pasta>/medicao.md, uma linha por agente com a descrição
+# Saída: a 1ª linha começa por MEDICAO e a 2ª traz os totais (subagentes, orquestrador, total); depois vêm só as linhas
+# que se aplicam (por papel, agentes rodando, sessão contada inteira, uma de aviso por sessão de janela vazia) e a
+# última, com o caminho do medicao.md e o histórico. Grava <pasta>/medicao.md, uma linha por agente com a descrição
 # que o orquestrador deu, e acrescenta ao histórico ${XDG_CACHE_HOME:-$HOME/.cache}/seiva/custos.jsonl (modo 600) uma
 # linha por agente encerrado: papel, família do modelo, nível da tarefa, ponderado, entrada e leitura de cache, quedas
-# e corridas. O histórico não leva texto: nem descrição, nem nome de tarefa, nem caminho. É dele que o
-# orcamento-local.sh --leva tira a previsão de custo de uma leva. Medir de novo a mesma tarefa substitui as linhas dos
-# mesmos agentes, sem duplicar. Agente com transcript mexido nos últimos 2 minutos está rodando: aparece na saída e não
-# entra no histórico.
+# e corridas. O histórico não leva texto: nem descrição, nem nome de tarefa, nem caminho. A linha do orquestrador tem
+# como chave orq-<sessão>:<12 primeiros do sha256 do nome da tarefa>, uma por sessão e tarefa; o hash distingue duas
+# tarefas da mesma sessão sem gravar o nome. É dele que o orcamento-local.sh --leva tira a previsão de custo de uma
+# leva. Medir de novo a mesma tarefa substitui as linhas dos mesmos agentes, sem duplicar. Linha orq-<sessão> de antes
+# da chave com hash fica como está: não é migrada nem apagada. Agente com transcript mexido nos últimos 2 minutos está
+# rodando: aparece na saída e não entra no histórico, a menos que o transcript principal da sessão já tenha o aviso de
+# encerramento dele (<task-notification> com <task-id> igual ao id do agente, em mensagem de usuário, attachment
+# queued_command ou queue-operation enqueue): aí é agente encerrado e entra. Sem o aviso, vale a regra dos 2 minutos.
 # Do pacote do agente só sai se ele cita a pasta (sim ou não), nunca o texto.
-# Códigos: 0 (mediu, ou não tinha o que medir, com o motivo na linha) e 2 (uso errado).
+# Códigos: 0 (mediu, ou não tinha o que medir, com o motivo na linha) e 2 (uso errado, ou pasta de trabalho / pasta
+# tarefas/ no lugar da pasta da tarefa).
 set -uo pipefail
 export LC_ALL=C
 umask 077
 
-uso() { echo "uso: medir.sh --tarefa <pasta-da-tarefa> [--sessao <id>]... [--fechar]" >&2; exit 2; }
+uso() {
+  echo "uso: medir.sh --tarefa <pasta-da-tarefa> [--sessao <id>]... [--fechar]" >&2
+  echo "     <pasta-da-tarefa> é <trabalho>/tarefas/<tarefa>, nunca a pasta de trabalho nem a tarefas/" >&2
+  exit 2
+}
 
 tarefa=""
 fechar=0
@@ -66,7 +85,24 @@ awk -v p="$pcl" 'BEGIN { exit !(p ~ /^[0-9]*\.?[0-9]+$/ && p + 0 <= 1) }' ||
 command -v jq >/dev/null 2>&1 || { echo "MEDICAO desligada — jq não está instalado"; exit 0; }
 
 pasta=$(cd -- "$tarefa" 2>/dev/null && pwd -P) || { echo "--tarefa: não consegui entrar em $tarefa" >&2; exit 2; }
+# Trava de pasta, antes de qualquer gravação: --tarefa pede a pasta da tarefa. A de trabalho (tem tarefas/) e a própria
+# tarefas/ (tem subpasta com registro.md ou progresso.md) são recusadas; --fechar, medicao.md e histórico nem chegam a rodar.
+if [ -d "$pasta/tarefas" ]; then
+  echo "medir.sh: $pasta é pasta de trabalho (tem tarefas/); --tarefa pede a pasta da tarefa, $pasta/tarefas/<tarefa>" >&2
+  exit 2
+fi
+if [ "${pasta##*/}" = tarefas ]; then
+  for d in "$pasta"/*/; do
+    if [ -f "${d}registro.md" ] || [ -f "${d}progresso.md" ]; then
+      echo "medir.sh: $pasta é a pasta tarefas/; --tarefa pede uma tarefa dentro dela, $pasta/<tarefa>" >&2
+      exit 2
+    fi
+  done
+fi
 nome=${pasta##*/}
+# Impressão do nome da tarefa (12 primeiros do sha256), para a linha do orquestrador no histórico ser uma por sessão e
+# tarefa sem levar o nome. O cksum só entra se a máquina não tiver nenhum dos dois sha256.
+hnome=$(printf '%s' "$nome" | { sha256sum 2>/dev/null || shasum -a 256 2>/dev/null || cksum; } | cut -d' ' -f1 | cut -c1-12)
 trans=${SEIVA_TRANSCRIPTS:-${HOME:-/nonexistent}/.claude/projects}
 agora=$(date +%s)
 avisos=()
@@ -97,6 +133,9 @@ for f in "$pasta"/../*/sessoes; do
   i=$((i + 1))
   outras=$(jq -c --argjson a "$outras" --argjson b "$(marcas_de "$f" "$i")" -n '$a + $b')
 done
+
+# As sessões de --sessao, para o jq distinguir das que só têm marca: a explícita conta inteira.
+expl=$(jq -nc '$ARGS.positional' --args ${explicitas[@]+"${explicitas[@]}"})
 
 sessoes=$(jq -rn --argjson m "$marcas" --args '[$m[].s] + $ARGS.positional | unique | .[]' ${explicitas[@]+"${explicitas[@]}"})
 
@@ -139,14 +178,45 @@ for s in $sessoes; do
       a=${a%.meta.json}
       metas=$(jq -c --argjson m "$metas" --arg a "$a" '$m + {($a): {d: (.description // "" | tostring | .[0:120])}}' "$f" 2>/dev/null || printf '%s' "$metas")
     done
-    for f in $(find "$sub" -name 'agent-*.jsonl' -mmin -2 2>/dev/null); do
-      a=${f##*/agent-}
-      rodando=$(jq -c --argjson r "$rodando" --arg a "${a%.jsonl}" -n '$r + [$a]')
-    done
+    # Mexido há menos de 2 minutos é agente rodando, a menos que o transcript principal já traga o aviso de encerramento
+    # dele: <task-notification> com <task-id> igual ao id do agente, em qualquer das três formas em que o Claude Code o
+    # grava (mensagem de usuário, attachment queued_command e queue-operation enqueue). Só abre o principal se há agente
+    # recente; o grep tira as linhas que o jq vai ler.
+    recentes=$(find "$sub" -name 'agent-*.jsonl' -mmin -2 2>/dev/null)
+    if [ -n "$recentes" ]; then
+      encerrados=$(grep -F -- 'task-notification' "$principal" 2>/dev/null | jq -Rr '
+        fromjson? | select(type == "object")
+        | try (
+            (if .type == "user" then (.message | objects | .content)
+             elif .type == "attachment" then (.attachment | objects | select(.type == "queued_command") | .prompt)
+             elif .type == "queue-operation" and .operation == "enqueue" then .content
+             else null end) as $c
+            | (if ($c | type) == "string" then $c
+               elif ($c | type) == "array" then [$c[] | .text? // empty | strings] | join(" ")
+               else "" end)
+            | select(ltrimstr("\n") | startswith("<task-notification>"))
+            | match("<task-id>([^<]*)</task-id>"; "g") | .captures[0].string
+          ) catch empty' 2>/dev/null)
+      for f in $recentes; do
+        a=${f##*/agent-}
+        a=${a%.jsonl}
+        case $'\n'"$encerrados"$'\n' in *$'\n'"$a"$'\n'*) continue ;; esac
+        rodando=$(jq -c --argjson r "$rodando" --arg a "$a" -n '$r + [$a]')
+      done
+    fi
   fi
   # Uma linha pequena por resposta (u), erro da API (e), mensagem do orquestrador ao agente (p) e descrição de agente
   # na chamada do Agent, no transcript principal (t), de reserva para quando falta o meta.json.
   jq -cR --arg s "$s" --arg n "$nome" '
+    # O nome da tarefa só conta inteiro: no começo do texto ou depois de caractere fora de [A-Za-z0-9_-], e no fim do
+    # texto ou antes de um. Assim x-2 não é x, e "x." e "(x)" são x. Sem regex montada com o nome: posições e vizinhos.
+    # Compara em code points (explode): o indices de texto conta byte até o jq 1.7.1 e caractere a partir do 1.8, e o
+    # de lista conta elemento em todas as versões. Acento antes do nome não desloca o vizinho conferido.
+    def viz: (. >= 48 and . <= 57) or (. >= 65 and . <= 90) or (. >= 97 and . <= 122) or . == 95 or . == 45;
+    def nome_inteiro($n):
+      (explode) as $t | ($n | explode) as $k | ($k | length) as $l
+      | ($l > 0) and any(($t | indices($k) // [])[]; . as $i
+          | ($i == 0 or ($t[$i - 1] | viz | not)) and (($t[$i + $l] // 32) | viz | not));
     fromjson? | select(type == "object")
     | (input_filename | split("/") | last | sub("\\.jsonl$"; "")) as $f
     | (if ($f | startswith("agent-")) then ($f | ltrimstr("agent-")) else "" end) as $a
@@ -168,7 +238,7 @@ for s in $sessoes; do
         # Lembrete do harness começa por tag e não é corrida; a mensagem do orquestrador a um agente rodando vem marcada
         # isMeta, sem tag, e é.
         | if $t == null or ($t | ltrimstr("\n") | startswith("<")) then empty
-          else {k: "p", s: $s, a: $a, ln: input_line_number, cita: ($t | contains($n))} end
+          else {k: "p", s: $s, a: $a, ln: input_line_number, cita: ($t | nome_inteiro($n))} end
       elif .type == "user" and $a == "" and (.toolUseResult | type) == "object" and (.toolUseResult.agentId | type) == "string" then
         {k: "t", a: (.toolUseResult.agentId | gsub("[^A-Za-z0-9]"; "")), d: (.toolUseResult.description // "" | tostring | .[0:120])}
       else empty end
@@ -184,7 +254,8 @@ fi
 [ ${#sem[@]} -gt 0 ] && avisos+=("${#sem[@]} sessão(ões) sem transcript (o Claude Code apaga depois de 30 dias): ${sem[*]}")
 
 jq -s -c --argjson marcas "$marcas" --argjson outras "$outras" --argjson metas "$metas" --argjson rodando "$rodando" \
-  --argjson agora "$agora" --argjson pcl "$pcl" --arg nome "$nome" --arg nivel "$nivel" --args '
+  --argjson expl "$expl" --arg pasta "$pasta" --argjson agora "$agora" --argjson pcl "$pcl" --arg nome "$nome" --arg nivel "$nivel" \
+  --arg hnome "$hnome" --args '
   def fmt: if . >= 1000000 then "\((. / 100000 | floor) / 10) mi" else "\(. / 1000 | floor) mil" end | gsub("\\."; ",");
   def milhar: floor | tostring | explode | reverse | [recurse(.[3:]; length > 0) | .[0:3] | reverse | implode] | reverse | join(".");
   def hora: if . == null then "?" else strftime("%Y-%m-%d %H:%M") end;
@@ -219,10 +290,15 @@ jq -s -c --argjson marcas "$marcas" --argjson outras "$outras" --argjson metas "
   | ((($ms | keys) + $ARGS.positional) | unique) as $sessoes
   | [$sessoes[] as $s
       | ($ms[$s].ts // []) as $m
-      | (if ($m | length) > 0 then {ini: $m[0], fim: $m[-1], modo: "marcas", fecha: $ms[$s].fecha}
+      # Sessão de --sessao conta inteira, com marca ou sem. Marcas todas no mesmo segundo: janela vazia, nada contado.
+      | (if any($expl[]; . == $s) then
+           {ini: 0, fim: 1e15, modo: (if ($m | length) > 0 then "inteira-marcada" else "inteira" end), fecha: true}
+         elif ($m | length) > 0 then
+           {ini: $m[0], fim: $m[-1], modo: (if $m[0] == $m[-1] then "vazia" else "marcas" end), fecha: $ms[$s].fecha}
          else {ini: 0, fim: 1e15, modo: "inteira", fecha: true} end) as $j
-      | [$us[] | select(.s == $s and .a == "" and (.sc | not) and .ts >= $j.ini and .ts <= $j.fim)] as $o
-      | [$es[] | select(.s == $s and .a == "" and .ts >= $j.ini and .ts <= $j.fim)] as $oe
+      | ($j.modo == "vazia") as $vazia
+      | [$us[] | select(($vazia | not) and .s == $s and .a == "" and (.sc | not) and .ts >= $j.ini and .ts <= $j.fim)] as $o
+      | [$es[] | select(($vazia | not) and .s == $s and .a == "" and .ts >= $j.ini and .ts <= $j.fim)] as $oe
       | ([$outras[] | select(.s == $s and .ts >= $j.ini and .ts <= $j.fim) | .t] | unique) as $ot
       | [$ag[] | select(.s == $s and (.ini // -1) >= $j.ini and (.ini // -1) <= $j.fim)] as $base
       | (($base | map(select(.cita) | .w) | add) // 0) as $wt
@@ -232,25 +308,33 @@ jq -s -c --argjson marcas "$marcas" --argjson outras "$outras" --argjson metas "
       # Dividida: pela proporção dos subagentes; se só esta tarefa gastou com subagente na janela, em partes iguais.
       | (if ($div | not) then 1 elif ($wa - $wt) > 0 then $wt / $wa else 1 / (1 + ([($ot | length), 1] | max)) end) as $fr
       | {s: $s, modo: $j.modo, ini: $j.ini, fim: $j.fim, fecha: $j.fecha, respostas: ($o | length), quedas: ($oe | length),
-         x: ($o | map(.x) | add // 0), y: ($o | map(.y) | add // 0), w: ($wo * $fr), bruto: $wo, estimado: $div,
+         x: ($o | map(.x) | add // 0), y: ($o | map(.y) | add // 0), w: ($wo * $fr), bruto: $wo,
+         estimado: ($div and ($vazia | not)), nm: ($m | length),
          fr: $fr, sc: ([$us[] | select(.s == $s and .a == "" and .sc)] | length),
-         inim: ($o | map(.ts) | min), fimm: ($o | map(.ts) | max)}] as $orq
+         inim: (if $vazia then $j.ini else ($o | map(.ts) | min) end),
+         fimm: (if $vazia then $j.fim else ($o | map(.ts) | max) end)}] as $orq
 
   | (($daq | map(.w) | add) // 0) as $wsub
   | (($orq | map(.w) | add) // 0) as $worq
   | ($daq | map(select(.quedas > 0))) as $caiu
   | ($orq | map(select(.estimado))) as $est
-  | ($orq | map(select(.fecha | not))) as $aberta
+  | ($orq | map(select(.modo == "vazia"))) as $vz
+  | ($orq | map(select((.fecha | not) and (.modo != "vazia")))) as $aberta
+  | ([(if ($vz | length) > 0 then "janela vazia em \($vz | length) de \($orq | length) \(if ($orq | length) == 1 then "sessão" else "sessões" end): ver aviso" else empty end),
+      (if ($est | length) > 0 then "estimado em \($est | length) de \($orq | length) sessão(ões) dividida(s) com outra tarefa; ver medicao.md" else empty end)]
+     | if length == 0 then "medido" else join("; ") end) as $rotulo
 
   | {saida: [
       "MEDICAO \($nome) · \($sessoes | length) sessão(ões) · \($daq | length) agente(s) da tarefa · régua: entrada + saída + escrita de cache + \($pcl) × leitura de cache",
-      "subagentes ≈ \($wsub | fmt) · orquestrador ≈ \($worq | fmt) (\(if ($est | length) == 0 then "medido" else "estimado em \($est | length) de \($orq | length) sessão(ões) dividida(s) com outra tarefa; ver medicao.md" end)) · total ≈ \(($wsub + $worq) | fmt) · quedas: \($daq | map(.quedas) | add // 0) em \($caiu | length) agente(s)\(if ($caiu | length) > 0 then ", que gastaram \($caiu | map(.w) | add | fmt) (com o que entregaram antes de cair)" else "" end)",
+      "subagentes ≈ \($wsub | fmt) · orquestrador ≈ \($worq | fmt) (\($rotulo)) · total ≈ \(($wsub + $worq) | fmt) · quedas: \($daq | map(.quedas) | add // 0) em \($caiu | length) agente(s)\(if ($caiu | length) > 0 then ", que gastaram \($caiu | map(.w) | add | fmt) (com o que entregaram antes de cair)" else "" end)",
       (if ($daq | length) == 0 then empty else
         "por papel: " + ($daq | group_by([.papel, .familia]) | map("\(.[0].papel) \(.[0].familia) ×\(length) = \(map(.w) | add | fmt)") | join(" · ")) end),
       (if ($daq | map(select(.rodando)) | length) > 0 then "\($daq | map(select(.rodando)) | length) agente(s) rodando: medidos até agora, fora do histórico" else empty end),
       (if ($fora | length) > 0 then "\($fora | length) subagente(s) das mesmas sessões cujo pacote não cita a pasta: \($fora | map(.w) | add | fmt), fora da conta" else empty end),
       (if ($orq | map(.sc) | add // 0) > 0 then "\($orq | map(.sc) | add) resposta(s) de subagente no transcript principal (formato antigo do Claude Code): fora da conta" else empty end),
       (if ($orq | any(.modo == "inteira")) then "sessão sem marca contada inteira: \($orq | map(select(.modo == "inteira") | .s[0:8]) | join(", "))" else empty end),
+      (if ($orq | any(.modo == "inteira-marcada")) then "sessão contada inteira por --sessao, apesar da marca em \($pasta)/sessoes: \($orq | map(select(.modo == "inteira-marcada") | .s[0:8]) | join(", "))" else empty end),
+      ($vz[] | "sessão \(.s[0:8]): janela vazia, \(.nm) marca(s) no mesmo segundo (\(.ini | strftime("%H:%M UTC"))), nada contado. --sessao \(.s) conta a sessão inteira; com a marca de abertura e o --fechar a janela passa a existir"),
       (if ($aberta | length) > 0 then "orquestrador contado até a última marca (\($aberta | map(.fim | strftime("%H:%M UTC")) | join(", "))): no fechamento, rode com --fechar" else empty end)
     ],
     md: ([
@@ -261,7 +345,7 @@ jq -s -c --argjson marcas "$marcas" --argjson outras "$outras" --argjson metas "
       "| Agente | Papel | Modelo | Início → fim (UTC) | Corridas | Quedas | Respostas | Ponderado | Descrição |",
       "|---|---|---|---|---|---|---|---|---|",
       ($daq | sort_by(.ini)[] | "| \(.a[0:8]) | \(.papel) | \(.modelo | sub("^claude-"; "")) | \(.ini | hora) → \(.fim | hora) | \(.corridas) | \(.quedas) | \(.respostas) | \(.w | milhar)\(if .rodando then " (rodando)" else "" end) | \(.d | celula) |"),
-      ($orq[] | "| orquestrador \(.s[0:8]) | — | — | \(.inim | hora) → \(.fimm | hora) | — | \(.quedas) | \(.respostas) | \(.w | milhar)\(if .estimado then " (estimado: \(.fr * 100 | floor)% de \(.bruto | milhar))" else "" end) | \(if .modo == "inteira" then "sessão inteira, sem marca" else "entre a 1ª e a última marca" end) |"),
+      ($orq[] | "| orquestrador \(.s[0:8]) | — | — | \(.inim | hora) → \(.fimm | hora) | — | \(.quedas) | \(.respostas) | \(.w | milhar)\(if .estimado then " (estimado: \(.fr * 100 | floor)% de \(.bruto | milhar))" else "" end) | \(if .modo == "vazia" then "janela vazia: \(.nm) marca(s) no mesmo segundo" elif .modo == "inteira" then "sessão inteira, sem marca" elif .modo == "inteira-marcada" then "sessão inteira (--sessao), marca ignorada" else "entre a 1ª e a última marca" end) |"),
       "",
       "Subagentes: \($wsub | milhar) · orquestrador: \($worq | milhar)\(if ($est | length) > 0 then " (estimado em parte)" else "" end) · total: \(($wsub + $worq) | milhar)"
     ] | join("\n")),
@@ -269,7 +353,7 @@ jq -s -c --argjson marcas "$marcas" --argjson outras "$outras" --argjson metas "
              | {v: 1, agente: .a, papel, modelo: .familia, nivel: (if $nivel == "" then null else $nivel end),
                 ponderado: (.w | floor), x, y, respostas, quedas, corridas, ini, fim, medido_em: $agora}]
            + [$orq[] | select(.respostas > 0)
-             | {v: 1, agente: ("orq-" + .s), papel: "orquestrador", modelo: null, nivel: (if $nivel == "" then null else $nivel end),
+             | {v: 1, agente: ("orq-" + .s + ":" + $hnome), papel: "orquestrador", modelo: null, nivel: (if $nivel == "" then null else $nivel end),
                 ponderado: (.w | floor), x: (.x * .fr | floor), y: (.y * .fr | floor), respostas, quedas, corridas: null,
                 ini: .inim, fim: .fimm, estimado, medido_em: $agora}])}
 ' ${sessoes} <"$tmp/linhas" >"$tmp/r.json" 2>"$tmp/err" ||

@@ -13,9 +13,9 @@ O `registro.md` continua sendo o histórico da tarefa (triagem, decisões, agent
 
 | Momento | O que fazer |
 |---|---|
-| Fechou uma etapa | `progresso.sh <pasta> marcar <n> feita <artefatos>`; reescreva o `contexto-tarefa.md` |
+| Fechou uma etapa | `progresso.sh <pasta-da-tarefa> marcar <n> feita <artefatos>`; reescreva o `contexto-tarefa.md` |
 | Antes de cada leva | `orcamento-local.sh --tarefa <pasta> --leva "<papel>:<modelo> ..."`; grave o pacote de cada agente em `relatorios/pacote-<papel>-r<n>.md`; atualize só a Próxima ação: quem vai ser disparado e o relatório que cada um deve deixar |
-| Rodada nova num portão | `progresso.sh <pasta> marcar <n> "em-curso: rodada 2/2"` |
+| Rodada nova num portão | `progresso.sh <pasta-da-tarefa> marcar <n> "em-curso: rodada 2/2"` |
 | Parada limpa | os dois arquivos em dia e uma linha na seção Retomada do `registro.md` |
 
 A atualização antes da leva é uma edição de 3 linhas, não a reescrita do arquivo.
@@ -38,7 +38,7 @@ Nunca sugira "Tentar novamente" numa sessão grande. Depois da pausa, retomar a 
 
 Vale para "retome <caminho>", para "continue" ou "tentar novamente" com tarefa em curso, para a sessão que voltou de pausa por limite de uso e para contexto compactado. O usuário não precisa pedir: o orquestrador percebe a situação e segue estes passos sozinho.
 
-1. Sem caminho, rode `progresso.sh <pasta-de-trabalho> pendentes`. Com uma tarefa na lista, siga com ela. Com mais de uma, pergunte qual, numa pergunta só.
+1. Sem caminho, rode `progresso.sh <pasta-de-trabalho> pendentes`. Com uma tarefa na lista, siga com ela. Com mais de uma, pergunte qual, numa pergunta só. Com a pasta de uma tarefa no lugar da de trabalho, o script sai com código 2 e diz qual pasta espera.
 2. Leia o `contexto-tarefa.md` e rode `progresso.sh <pasta-da-tarefa> conferir`. Só isso: nem o `registro.md`, nem os relatórios, nem a conversa anterior.
 3. Siga da linha `PROXIMA`. Etapa feita não roda de novo. Artefato que `MUDOU` depois de feito pede que você abra o artefato e decida, porque outra sessão ou uma rodada de correção pode tê-lo mudado de propósito; não é motivo para refazer a etapa.
 4. Leva que caiu no meio: redispare só o agente cujo relatório não está em `relatorios/`, pelo pacote gravado em `relatorios/pacote-*.md`.

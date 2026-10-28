@@ -128,6 +128,16 @@ Os scripts têm teste automático em `testes/scripts/`, e todos rodam com `for t
 - Esperado: o `ficha-tecnica.sh` não lê nenhuma das três e as lista como puladas, "fora do repositório"; o trecho da chave sai com cada linha dela trocada por `<OMITIDO chave privada>`, a numeração intacta e os trechos seguintes no lugar.
 - Reprova se: o conteúdo de fora aparece em `trechos.md` ou nas fichas, ou o corpo da chave sai em claro.
 
+**C16 · Relatório de lente fora do formato**
+- Situação: o pacote das lentes pediu numeração `L-n`, e o relatório chega com `[L-1] ALTO · dados` ou `### L-1 (ALTO)`, `Arquivo:` e `Problema:`, sem nenhum `[A-n]` (caso real: ciclo-arboris, tarefa 2026-10-05, lentes do plano C).
+- Esperado: o `julgar-pre.sh` sai com código 0, a 1ª linha termina em `N não contado(s)` e a lista de não contados traz `relatório:linha` do achado fora do formato, sem texto do relatório. O orquestrador abre o relatório nessa linha e julga à mão.
+- Reprova se: a 1ª linha diz só `0 achados (nenhum)` e nada aparece na lista; ou o aviso copia texto do relatório.
+
+**C17 · Relatório válido sem achado**
+- Situação: o adversário devolve `ACHADOS: nenhum`, hipóteses do pre-mortem e duas suspeitas no formato `S-1 MÉDIO · contrato · confiança 5`.
+- Esperado: `0 achados (nenhum)`, sem aviso de fora do formato. Zero achados é resultado válido (`referencias/contratos.md`).
+- Reprova se: a suspeita `S-n` ou uma hipótese com `Cenário:` vira aviso de achado fora do formato.
+
 ## Projeto manda
 
 **P1 · Regra do projeto contra regra da seiva**
@@ -293,6 +303,31 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 - Esperado: `medir.sh --tarefa <pasta> --fechar`; a linha do `aprendizado.md` usa os números dele (subagentes, orquestrador, quedas), e o orquestrador marcado `estimado` aparece como estimado na entrega.
 - Reprova se: soma os números da notificação de fim dos subagentes; ou apresenta como medido o orquestrador que o `medir.sh` marcou `estimado`.
 
+**O16 · Sessão com uma marca só**
+- Situação: a sessão do orquestrador ganhou uma marca só (um `orcamento-local.sh --tarefa`, ou marcas no mesmo segundo), e o `medir.sh` mede a tarefa; ou o orquestrador passa essa sessão por `--sessao` (caso real: sessão d17eed24, 14/10, saiu com orquestrador 0).
+- Esperado: sem `--sessao`, a janela vazia é dita na saída, com os dois caminhos (`--sessao <id>` ou `--fechar`); com `--sessao`, a sessão conta inteira, e a saída diz que a marca foi ignorada.
+- Reprova se: sai `orquestrador ≈ 0` sem aviso; ou o `--sessao` explícito continua contando só entre as marcas.
+
+**O17 · Hora local do /usage**
+- Situação: o usuário cola o `/usage` com a hora local (`08:21`, `8:21am`) e o orquestrador grava a leitura (caso real: 2026-10-21 08:21 BRT, a conversão à mão para UTC saiu errada e o script recusou).
+- Esperado: `orcamento-local.sh --calibrar <pct> --em 08:21` aceita, lê na hora local do sistema (a ocorrência mais recente que não está no futuro) e a confirmação mostra a hora lida, o fuso e o equivalente em UTC. ISO sem fuso continua recusado, com as formas aceitas na mensagem.
+- Reprova se: o orquestrador converte a hora à mão; a hora local é lida como UTC; ou uma data sem fuso entra em silêncio.
+
+**O18 · /usage lido do transcript**
+- Situação: o usuário roda `/usage` no terminal ou na aba Code, e o orquestrador não cola nada (caso real: 2026-10-26, quatro leituras coladas à mão numa noite enquanto o registro já estava no transcript, com o percentual e a hora de reinício).
+- Esperado: a próxima execução do `orcamento-local.sh` grava a leitura com a hora do registro e `fonte transcript`, usa a hora de reinício como fim da janela e não duplica a leitura colada com o mesmo percentual até 15 minutos antes ou depois. Leitura abaixo de 10% só ancora aquela execução. Registro do `/usage` com `usageReport` ou texto que não casa gera um aviso na linha.
+- Reprova se: o orquestrador precisa de `--calibrar` para usar um `/usage` que está no transcript; a mesma leitura entra duas vezes; uma leitura de 0% derruba a linha ou o `--leituras`; ou o formato muda e a captura para sem aviso.
+
+**O19 · Leitura da janela manda no limite**
+- Situação: a janela aberta tem `/usage` de 10% ou mais, e os limites batidos antigos dão um limite menor (caso real: 2026-10-26, leituras dando ≈ 3,5 mi contra 1,6 a 2,3 mi dos limites de 16 a 20/10; às 21:57 a estimativa dava 109% e o `/usage` dizia 82%).
+- Esperado: o limite é a mediana dos limites que as leituras dessa janela dão, e a linha diz `leitura da janela`. Sem leitura de 10% ou mais na janela, vale o menor dos 5 pontos, como antes.
+- Reprova se: limite batido antigo vence uma leitura da janela aberta; ou o rótulo não diz de onde veio o limite.
+
+**O20 · Medição de duas tarefas na mesma sessão**
+- Situação: uma sessão do orquestrador atende duas tarefas, uma com nome que começa pelo da outra (`…-x` e `…-x-2`), e um agente termina segundos antes do `medir.sh --fechar` (caso real: o revisor da 1.3.1 saiu "(rodando)" e ficou fora do histórico; achado A-12 da mesma revisão).
+- Esperado: cada agente conta só para a tarefa cujo nome ele cita inteiro; o histórico ganha uma linha de orquestrador por tarefa, sem o nome dela; o agente com aviso de fim no transcript principal entra no histórico mesmo mexido há menos de 2 minutos.
+- Reprova se: a tarefa `…-x` soma os agentes da `…-x-2`; a 2ª medição apaga a linha do orquestrador da 1ª; ou um agente encerrado sai "(rodando)".
+
 ## Retomada
 
 **R1 · Queda no meio da leva N2**
@@ -319,6 +354,21 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 - Situação: o `conferir` mostra `plano.md MUDOU depois de feita`.
 - Esperado: o orquestrador abre o plano, vê o que mudou e decide; a etapa 3 não roda de novo por isso.
 - Reprova se: dispara o construtor de novo sem olhar, ou ignora o aviso.
+
+**R6 · Pendentes com a pasta da tarefa**
+- Situação: na retomada, o orquestrador roda `progresso.sh <pasta da tarefa> pendentes`, com a tarefa parada na etapa 6 (caso real: ciclo-arboris, 2026-10-15, escape E-1).
+- Esperado: o script sai com código 2 e diz que espera a pasta de trabalho; o orquestrador roda de novo com ela e segue pela tarefa listada.
+- Reprova se: o script responde "nenhuma tarefa por terminar" com código 0, e o orquestrador recomeça uma etapa feita.
+
+**R7 · Marcar na pasta de trabalho**
+- Situação: o orquestrador roda `progresso.sh <pasta de trabalho> marcar 3 feita plano.md` (sem caso real registrado; mesma classe do E-1, medida no plano da tarefa 2026-10-26-pendencias-scripts).
+- Esperado: código 2, a mensagem diz que espera a pasta da tarefa, e nenhum `progresso.md` é criado na pasta de trabalho. Se a pasta tiver `tarefas/` e também um `progresso.md` solto, vale a `tarefas/`: o `pendentes` lista as tarefas.
+- Reprova se: um `progresso.md` aparece na raiz da pasta de trabalho; ou o `pendentes` passa a recusar a pasta de trabalho por causa dele.
+
+**R8 · Pasta do tipo vizinho em qualquer script**
+- Situação: um script que pede a pasta da tarefa (`medir.sh`, `julgar-pre.sh`, `ficha-tecnica.sh`, `diff-tarefa.sh`, `orcamento-local.sh --tarefa`, `progresso.sh marcar`) recebe a pasta de trabalho ou a pasta `tarefas/`; ou o `nova-tarefa.sh`, que pede a de trabalho, recebe a de uma tarefa (caso real, escape E-3: a lente da tarefa 2026-10-26-pendencias-scripts viu `medir.sh --fechar` e `julgar-pre.sh` gravarem `sessoes`, `medicao.md` e `achados.md` na pasta de trabalho).
+- Esperado: código 2, a mensagem diz qual pasta espera e onde ela fica, e nada é criado nem mexido. O caminho é resolvido antes (`tarefas/.` conta como `tarefas`).
+- Reprova se: qualquer arquivo aparece na pasta errada; ou um dos scripts aceita a pasta vizinha com código 0.
 
 ## Evolução
 

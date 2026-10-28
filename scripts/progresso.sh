@@ -15,13 +15,18 @@
 #       As tarefas de <pasta-de-trabalho>/tarefas/ com a etapa 9 por fazer, da mais recente para a mais antiga (até 5).
 #
 # Hash que mudou não manda refazer a etapa: manda olhar o artefato (outra sessão, ou uma rodada de correção, pode tê-lo
-# mudado de propósito). Uso errado sai com 2.
+# mudado de propósito). Uso errado sai com 2, e inclui apontar a pasta errada: pendentes numa pasta de tarefa ou na
+# própria tarefas/ (a mensagem nomeia a pasta que a contém), ou marcar e conferir numa pasta de trabalho (a que tem
+# tarefas/) ou na tarefas/. A tarefas/ é a pasta de nome tarefas com alguma subpasta que tenha registro.md ou
+# progresso.md; o caminho é resolvido antes de classificar ("." e ".." e link simbólico caem no mesmo lugar). Nesses
+# casos nada é lido nem criado.
 set -uo pipefail
 
 uso() {
   echo "uso: progresso.sh <pasta-da-tarefa> marcar <0-9> <pendente|em-curso|feita|pulada[: nota]> [artefato...]" >&2
   echo "     progresso.sh <pasta-da-tarefa> conferir" >&2
   echo "     progresso.sh <pasta-de-trabalho> pendentes" >&2
+  echo "     pasta errada (pendentes numa tarefa ou na tarefas/; marcar ou conferir numa pasta com tarefas/ ou na tarefas/) sai com 2, sem criar nada." >&2
   exit 2
 }
 
@@ -30,6 +35,8 @@ pasta=${1%/}
 acao=$2
 shift 2
 [ -d "$pasta" ] || { echo "a pasta não existe: $pasta" >&2; exit 2; }
+# O caminho resolvido: a classificação e as mensagens usam este, não o que foi digitado.
+abs=$(cd -- "$pasta" 2>/dev/null && pwd -P) || { echo "a pasta não existe: $pasta" >&2; exit 2; }
 
 hash12() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -39,9 +46,45 @@ hash12() {
   fi
 }
 caminho() { case $1 in /*) printf '%s\n' "$1" ;; *) printf '%s\n' "$pasta/$1" ;; esac; }
+# Que pasta é esta, pela raiz dela (caminho já resolvido): trabalho (tem tarefas/, e isso vence sempre), tarefas (o nome
+# é tarefas e alguma subpasta tem registro.md ou progresso.md; um progresso.md solto na raiz dela não a muda), tarefa
+# (tem progresso.md ou registro.md) ou outra (segue como antes em cada ação).
+classe() {
+  local sub
+  if [ -d "$1/tarefas" ]; then
+    echo trabalho
+    return
+  fi
+  if [ "${1##*/}" = tarefas ]; then
+    for sub in "$1"/*/; do
+      if [ -f "${sub}registro.md" ] || [ -f "${sub}progresso.md" ]; then
+        echo tarefas
+        return
+      fi
+    done
+  fi
+  if [ -f "$1/progresso.md" ] || [ -f "$1/registro.md" ]; then echo tarefa
+  else echo outra
+  fi
+}
 
 if [ "$acao" = pendentes ]; then
   [ "$#" -eq 0 ] || uso
+  classe_pasta=$(classe "$abs")
+  if [ "$classe_pasta" = tarefas ]; then
+    echo "progresso.sh: $abs é a pasta tarefas/; pendentes pede a pasta que a contém, $(dirname -- "$abs")" >&2
+    exit 2
+  fi
+  if [ "$classe_pasta" = tarefa ]; then
+    pai=$(dirname -- "$abs")
+    msg="$abs é pasta de tarefa; pendentes pede a pasta de trabalho, a que contém tarefas/"
+    # Só nomeia a pasta de trabalho quando a tarefa está em <trabalho>/tarefas/<tarefa>; fora disso não inventa caminho.
+    if [ "$(basename -- "$pai")" = tarefas ]; then
+      msg="$msg: $(dirname -- "$pai")"
+    fi
+    echo "$msg" >&2
+    exit 2
+  fi
   achou=0
   while IFS= read -r p; do
     p=${p%/}
@@ -56,6 +99,21 @@ if [ "$acao" = pendentes ]; then
   [ "$achou" -gt 0 ] || echo "nenhuma tarefa por terminar em $pasta/tarefas"
   exit 0
 fi
+
+case $acao in
+  marcar | conferir)
+    classe_pasta=$(classe "$abs")
+    if [ "$classe_pasta" = trabalho ]; then
+      echo "progresso.sh: $abs é pasta de trabalho (tem tarefas/); $acao pede a pasta da tarefa, $abs/tarefas/<tarefa>" >&2
+      [ ! -f "$abs/progresso.md" ] || echo "há um progresso.md solto em $abs: veio de um marcar errado e pode ser apagado à mão" >&2
+      exit 2
+    fi
+    if [ "$classe_pasta" = tarefas ]; then
+      echo "progresso.sh: $abs é a pasta tarefas/; $acao pede uma tarefa dentro dela, $abs/<tarefa>" >&2
+      exit 2
+    fi
+    ;;
+esac
 
 arq=$pasta/progresso.md
 if [ ! -f "$arq" ]; then

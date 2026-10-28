@@ -157,6 +157,213 @@ tem "tarefa antiga: manda retomar pelo registro" "$ERR" "retome pelo registro.md
 roda "$V" marcar 2 em-curso
 eq "tarefa antiga: marcar cria o progresso pelo molde" 10 "$(grep -cE '^\| [0-9] ' "$V/progresso.md")"
 
+# --- pasta de tarefa e pasta de trabalho não se confundem (1.3 e D-9) -------------------
+# pendentes pede a pasta de trabalho (a que tem tarefas/); marcar e conferir pedem a pasta da tarefa. Cada caso
+# usa a sua pasta, para um erro de um não contaminar o seguinte.
+pw() { (cd -- "$1" && pwd -P); }
+roda_em() { # roda_em <pasta-onde-estar> <argumentos...>
+  local onde=$1
+  shift
+  SAI=$(cd -- "$onde" && bash "$PRG" "$@" 2>"$T/err")
+  RC=$?
+  ERR=$(cat "$T/err")
+}
+# PG1 · pasta de trabalho com uma tarefa por terminar: lista, como sempre
+G1=$T/pg1
+mkdir -p "$G1"
+(cd "$T" && bash "$NOVA" "$G1" pg-um >/dev/null)
+roda "$G1" pendentes
+eq "PG1 · pendentes na pasta de trabalho: código 0" 0 "$RC"
+tem "PG1 · lista a tarefa por terminar" "$SAI" "pg-um · 0 Terreno"
+eq "PG1 · nada em stderr" "" "$ERR"
+
+# PG2 · pendentes na pasta da tarefa: recusa e nomeia a pasta de trabalho
+G2=$T/pg2
+mkdir -p "$G2"
+P2=$(cd "$T" && bash "$NOVA" "$G2" pg-dois)
+G2R=$(pw "$G2")
+roda "$P2" pendentes
+eq "PG2 · pendentes na pasta da tarefa: código 2" 2 "$RC"
+eq "PG2 · stdout vazio" "" "$SAI"
+tem "PG2 · diz que é pasta de tarefa" "$ERR" "pasta de tarefa"
+eq "PG2 · a mensagem termina na pasta de trabalho" "$G2R" "${ERR##*tarefas/: }"
+
+# PG3 · tarefa de antes da 1.2.0 (só registro.md): mesma recusa
+G3=$T/pg3
+mkdir -p "$G3/tarefas/2026-01-01-velha"
+printf '# Registro\n' >"$G3/tarefas/2026-01-01-velha/registro.md"
+G3R=$(pw "$G3")
+roda "$G3/tarefas/2026-01-01-velha" pendentes
+eq "PG3 · tarefa só com registro.md: código 2" 2 "$RC"
+eq "PG3 · stdout vazio" "" "$SAI"
+tem "PG3 · diz que é pasta de tarefa" "$ERR" "pasta de tarefa"
+eq "PG3 · a mensagem termina na pasta de trabalho" "$G3R" "${ERR##*tarefas/: }"
+
+# PG4 · caminho "." dentro da tarefa e caminho com barra final: a pasta de trabalho sai resolvida
+roda_em "$P2" . pendentes
+eq "PG4 · caminho '.': código 2" 2 "$RC"
+eq "PG4 · caminho '.': stdout vazio" "" "$SAI"
+eq "PG4 · caminho '.': pasta de trabalho em caminho absoluto" "$G2R" "${ERR##*tarefas/: }"
+roda "$P2/" pendentes
+eq "PG4 · barra final: código 2" 2 "$RC"
+eq "PG4 · barra final: pasta de trabalho em caminho absoluto" "$G2R" "${ERR##*tarefas/: }"
+
+# PG5 · pasta de trabalho de projeto novo, sem tarefas/: nada por terminar, como hoje
+G5=$T/pg5
+mkdir -p "$G5"
+printf '# Perfil\n' >"$G5/perfil.md"
+roda "$G5" pendentes
+eq "PG5 · pasta de trabalho sem tarefas/: código 0" 0 "$RC"
+tem "PG5 · nenhuma tarefa por terminar" "$SAI" "nenhuma tarefa por terminar"
+
+# PG6 · pasta de tarefa fora de .../tarefas/<tarefa>: a mensagem diz o que procurar, sem inventar caminho
+G6=$T/pg6
+mkdir -p "$G6"
+cp -R "$P2" "$G6/minha-tarefa"
+roda "$G6/minha-tarefa" pendentes
+eq "PG6 · tarefa fora de tarefas/: código 2" 2 "$RC"
+eq "PG6 · stdout vazio" "" "$SAI"
+tem "PG6 · diz que é pasta de tarefa" "$ERR" "pasta de tarefa"
+tem "PG6 · diz o que procurar" "$ERR" "a que contém tarefas/"
+sem_o_dado=${ERR//"$(pw "$G6/minha-tarefa")"/}
+nao_tem "PG6 · não inventa caminho (só a própria tarefa aparece)" "$sem_o_dado" "$T"
+
+# PG7 · marcar na pasta de trabalho (D-9): recusa, e não cria progresso.md na raiz
+G7=$T/pg7
+mkdir -p "$G7"
+(cd "$T" && bash "$NOVA" "$G7" pg-sete >/dev/null)
+roda "$G7" marcar 3 feita
+eq "PG7 · marcar na pasta de trabalho: código 2" 2 "$RC"
+eq "PG7 · stdout vazio" "" "$SAI"
+tem "PG7 · diz que é pasta de trabalho" "$ERR" "pasta de trabalho"
+tem "PG7 · pede a pasta da tarefa" "$ERR" "$G7/tarefas/<tarefa>"
+nao_tem "PG7 · sem progresso.md solto, não fala de arquivo solto" "$ERR" "solto"
+eq "PG7 · nenhum progresso.md criado na raiz" "nao" "$([ -e "$G7/progresso.md" ] && echo sim || echo nao)"
+
+# PG8 · conferir na pasta de trabalho (D-9): a mesma recusa
+G8=$T/pg8
+mkdir -p "$G8"
+(cd "$T" && bash "$NOVA" "$G8" pg-oito >/dev/null)
+roda "$G8" conferir
+eq "PG8 · conferir na pasta de trabalho: código 2" 2 "$RC"
+eq "PG8 · stdout vazio" "" "$SAI"
+tem "PG8 · diz que é pasta de trabalho" "$ERR" "pasta de trabalho"
+tem "PG8 · pede a pasta da tarefa" "$ERR" "$G8/tarefas/<tarefa>"
+eq "PG8 · nenhum progresso.md criado na raiz" "nao" "$([ -e "$G8/progresso.md" ] && echo sim || echo nao)"
+
+# PG9 · precedência: tarefas/ e progresso.md solto na mesma pasta. A pasta é de trabalho.
+G9=$T/pg9
+mkdir -p "$G9"
+(cd "$T" && bash "$NOVA" "$G9" pg-nove >/dev/null)
+printf 'solto\n' >"$G9/progresso.md"
+roda "$G9" pendentes
+eq "PG9 · pendentes lista como pasta de trabalho: código 0" 0 "$RC"
+tem "PG9 · pendentes lista a tarefa" "$SAI" "pg-nove"
+roda "$G9" marcar 3 feita
+eq "PG9 · marcar recusa: código 2" 2 "$RC"
+eq "PG9 · marcar: stdout vazio" "" "$SAI"
+tem "PG9 · marcar: cita o progresso.md solto" "$ERR" "progresso.md solto"
+tem "PG9 · marcar: diz que veio de um marcar errado" "$ERR" "marcar errado"
+roda "$G9" conferir
+eq "PG9 · conferir recusa: código 2" 2 "$RC"
+eq "PG9 · conferir: stdout vazio" "" "$SAI"
+tem "PG9 · conferir: cita o progresso.md solto" "$ERR" "progresso.md solto"
+eq "PG9 · o arquivo solto não foi apagado nem mexido" "solto" "$(cat "$G9/progresso.md" 2>/dev/null)"
+
+# PG10 · pasta sem tarefas/ e tarefa nova seguem como hoje
+G10=$T/pg10
+mkdir -p "$G10/vazia" "$G10/velha"
+printf '# Registro\n' >"$G10/velha/registro.md"
+roda "$G10/vazia" marcar 2 em-curso
+eq "PG10 · pasta sem progresso e sem tarefas/: marcar funciona" 0 "$RC"
+eq "PG10 · cria o progresso pelo molde (10 etapas)" 10 "$(grep -cE '^\| [0-9] ' "$G10/vazia/progresso.md")"
+roda "$G10/velha" marcar 2 em-curso
+eq "PG10 · tarefa só com registro.md: marcar funciona" 0 "$RC"
+eq "PG10 · cria o progresso pelo molde (10 etapas)" 10 "$(grep -cE '^\| [0-9] ' "$G10/velha/progresso.md")"
+mkdir -p "$G10/velha2"
+printf '# Registro\n' >"$G10/velha2/registro.md"
+roda "$G10/velha2" conferir
+eq "PG10 · tarefa só com registro.md: conferir recusa como hoje" 2 "$RC"
+tem "PG10 · manda retomar pelo registro" "$ERR" "retome pelo registro.md"
+G10N=$T/pg10n
+mkdir -p "$G10N"
+P10=$(cd "$T" && bash "$NOVA" "$G10N" pg-dez)
+roda "$P10" marcar 0 em-curso
+eq "PG10 · tarefa nova: marcar, código 0" 0 "$RC"
+eq "PG10 · tarefa nova: marcar, saída de sempre" "etapa 0: em-curso" "$SAI"
+roda "$P10" conferir
+eq "PG10 · tarefa nova: conferir, código 0" 0 "$RC"
+tem "PG10 · tarefa nova: conferir, a próxima é a etapa em curso" "$SAI" "PROXIMA 0 Terreno"
+
+# --- a pasta tarefas/ é um terceiro tipo de pasta (G-a a G-d) ---------------------------
+# pendentes pede a pasta que contém tarefas/; marcar e conferir pedem uma tarefa. Nenhum dos três cria nada na tarefas/.
+GW=$T/g-trabalho
+mkdir -p "$GW"
+GT=$(cd "$T" && bash "$NOVA" "$GW" g-um)
+GWR=$(pw "$GW")
+GTS=$GWR/tarefas
+
+# G-c · o caminho certo segue como hoje (controle)
+roda "$GW" pendentes
+eq "G-c · pendentes na pasta de trabalho: código 0" 0 "$RC"
+tem "G-c · pendentes lista a tarefa" "$SAI" "g-um · 0 Terreno"
+roda "$GT" marcar 0 em-curso
+eq "G-c · marcar na pasta da tarefa: código 0" 0 "$RC"
+eq "G-c · marcar na pasta da tarefa: saída de sempre" "etapa 0: em-curso" "$SAI"
+roda "$GT" conferir
+eq "G-c · conferir na pasta da tarefa: código 0" 0 "$RC"
+
+# G-a · pendentes na tarefas/: recusa e nomeia o pai
+roda "$GW/tarefas" pendentes
+eq "G-a · pendentes na tarefas/: código 2" 2 "$RC"
+eq "G-a · stdout vazio" "" "$SAI"
+tem "G-a · diz que é a pasta tarefas/" "$ERR" "é a pasta tarefas/"
+tem "G-a · diz o que pede" "$ERR" "pendentes pede a pasta que a contém, "
+eq "G-a · a mensagem termina no pai, em caminho absoluto" "$GWR" "${ERR##*a contém, }"
+roda_em "$GW/tarefas" . pendentes
+eq "G-a · caminho '.': código 2" 2 "$RC"
+eq "G-a · caminho '.': o pai sai resolvido" "$GWR" "${ERR##*a contém, }"
+roda "$GW/tarefas/" pendentes
+eq "G-a · barra final: código 2" 2 "$RC"
+
+# G-b · marcar e conferir na tarefas/: recusa, sem progresso.md criado
+roda "$GW/tarefas" marcar 3 feita
+eq "G-b · marcar na tarefas/: código 2" 2 "$RC"
+eq "G-b · stdout vazio" "" "$SAI"
+tem "G-b · diz que é a pasta tarefas/" "$ERR" "$GTS é a pasta tarefas/"
+tem "G-b · pede uma tarefa dentro dela" "$ERR" "marcar pede uma tarefa dentro dela, $GTS/<tarefa>"
+eq "G-b · nenhum progresso.md criado na tarefas/" nao "$([ -e "$GW/tarefas/progresso.md" ] && echo sim || echo nao)"
+roda "$GW/tarefas" conferir
+eq "G-b · conferir na tarefas/: código 2" 2 "$RC"
+eq "G-b · conferir: stdout vazio" "" "$SAI"
+tem "G-b · conferir: pede uma tarefa dentro dela" "$ERR" "conferir pede uma tarefa dentro dela, $GTS/<tarefa>"
+eq "G-b · conferir: nenhum progresso.md criado na tarefas/" nao "$([ -e "$GW/tarefas/progresso.md" ] && echo sim || echo nao)"
+
+# G-d · progresso.md solto na raiz da tarefas/: continua sendo a pasta tarefas (não vira pasta de tarefa)
+GW2=$T/g-trabalho-2
+mkdir -p "$GW2"
+(cd "$T" && bash "$NOVA" "$GW2" g-dois >/dev/null)
+GW2R=$(pw "$GW2")
+printf 'solto\n' >"$GW2/tarefas/progresso.md"
+roda "$GW2/tarefas" pendentes
+eq "G-d · pendentes com progresso.md solto: código 2" 2 "$RC"
+tem "G-d · pendentes: ainda é a pasta tarefas/" "$ERR" "é a pasta tarefas/"
+eq "G-d · pendentes: o pai sai nomeado" "$GW2R" "${ERR##*a contém, }"
+roda "$GW2/tarefas" marcar 3 feita
+eq "G-d · marcar com progresso.md solto: código 2" 2 "$RC"
+tem "G-d · marcar: ainda é a pasta tarefas/" "$ERR" "é a pasta tarefas/"
+roda "$GW2/tarefas" conferir
+eq "G-d · conferir com progresso.md solto: código 2" 2 "$RC"
+tem "G-d · conferir: ainda é a pasta tarefas/" "$ERR" "é a pasta tarefas/"
+eq "G-d · o arquivo solto não foi mexido" "solto" "$(cat "$GW2/tarefas/progresso.md" 2>/dev/null)"
+
+# G-b · a pasta tarefas/ por link simbólico com outro nome também é recusada
+ln -s "$GW2/tarefas" "$T/g-atalho"
+roda "$T/g-atalho" marcar 3 feita
+eq "G-b · tarefas/ por link simbólico: código 2" 2 "$RC"
+tem "G-b · tarefas/ por link simbólico: diz que é a pasta tarefas/" "$ERR" "é a pasta tarefas/"
+eq "G-b · tarefas/ por link simbólico: o arquivo solto não foi mexido" "solto" "$(cat "$GW2/tarefas/progresso.md" 2>/dev/null)"
+
 if [ "$erros" -ne 0 ]; then
   echo "FALHA: $erros de $n casos"
   exit 1

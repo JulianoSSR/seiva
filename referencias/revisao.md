@@ -25,7 +25,7 @@ Revisores rodam em paralelo e só leem. Nenhum revisor corrige o que audita.
 
 ## Julgamento (etapas 5 e 8)
 
-Antes de julgar, `scripts/julgar-pre.sh <pasta> <plano|codigo> <relatórios>` lê os relatórios da rodada, dá a cada achado um ID da tarefa (estável entre rodadas e portões), agrupa os que apontam o mesmo arquivo a até 3 linhas de distância e escreve em `achados.md` uma linha por achado, com a origem. Na conversa fica só a tabela que ele devolve. O detalhe (cenário, prova, correção) o orquestrador abre no relatório, pela origem, só para o que vai conferir. O script não julga: agrupar por causa e dar o veredito continua aqui.
+Antes de julgar, `scripts/julgar-pre.sh <pasta> <plano|codigo> <relatórios>` lê os relatórios da rodada, dá a cada achado um ID da tarefa (estável entre rodadas e portões), agrupa os que apontam o mesmo arquivo a até 3 linhas de distância e escreve em `achados.md` uma linha por achado, com a origem. Na conversa fica só a tabela que ele devolve. O detalhe (cenário, prova, correção) o orquestrador abre no relatório, pela origem, só para o que vai conferir. O script não julga: agrupar por causa e dar o veredito continua aqui. Quando um relatório traz achado fora do formato (`[L-n]`, `### L-1 (ALTO)`, `Arquivo:` sem `Onde:`), a 1ª linha termina em `N não contado(s): ver a lista abaixo`, e a lista diz o `relatório:linha` para abrir.
 
 Para cada achado, o orquestrador:
 

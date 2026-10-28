@@ -1,6 +1,6 @@
 # Progresso — {{SLUG}}
 
-Escrito por `scripts/progresso.sh`. Etapa `feita` não roda de novo. Na sessão nova, `progresso.sh <pasta> conferir` diz de onde seguir. Artefato que mudou depois de feito pede olhar o artefato, não refazer a etapa.
+Escrito por `scripts/progresso.sh`. Etapa `feita` não roda de novo. Na sessão nova, `progresso.sh <pasta-da-tarefa> conferir` diz de onde seguir. Artefato que mudou depois de feito pede olhar o artefato, não refazer a etapa.
 
 | Etapa | Status | Quando | Artefatos |
 |---|---|---|---|

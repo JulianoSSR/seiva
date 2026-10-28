@@ -5,10 +5,14 @@
 #
 # Uso: nova-tarefa.sh <pasta-de-trabalho> <slug>
 # Exemplo: nova-tarefa.sh .claude/seiva bug-088-errors
+# A pasta de trabalho é a que contém (ou vai conter) tarefas/; pasta nova ou vazia serve, é o primeiro uso num projeto.
+# Uso errado sai com 2, e inclui apontar a pasta errada: a de uma tarefa (raiz com registro.md ou progresso.md) ou a
+# própria tarefas/. Nesses dois casos nada é criado; a mensagem diz o que apontar.
 set -eu
 
 if [ "$#" -ne 2 ]; then
   echo "uso: $0 <pasta-de-trabalho> <slug>" >&2
+  echo "     a pasta de trabalho é a que contém tarefas/ (nova ou vazia serve); a pasta de uma tarefa ou a tarefas/ sai com 2, sem criar nada." >&2
   exit 2
 fi
 
@@ -21,6 +25,25 @@ case "$slug" in
     exit 2
     ;;
 esac
+
+# Trava de pasta: o script pede a pasta de trabalho. Com a pasta de uma tarefa (raiz com registro.md ou progresso.md) ou
+# com a tarefas/ (o nome é tarefas e alguma subpasta tem registro.md ou progresso.md), recusa com 2 antes de criar
+# qualquer coisa. Quem tem tarefas/ dentro é pasta de trabalho, e isso vence. O caminho é resolvido antes; pasta que
+# ainda não existe, ou vazia, segue (é o primeiro uso num projeto).
+if abs=$(cd -- "$base" 2>/dev/null && pwd -P) && [ ! -d "$abs/tarefas" ]; then
+  if [ "${abs##*/}" = tarefas ]; then
+    for sub in "$abs"/*/; do
+      if [ -f "${sub}registro.md" ] || [ -f "${sub}progresso.md" ]; then
+        echo "nova-tarefa.sh: $abs é a pasta tarefas/; nova-tarefa.sh pede a pasta que a contém, $(dirname -- "$abs")" >&2
+        exit 2
+      fi
+    done
+  fi
+  if [ -f "$abs/registro.md" ] || [ -f "$abs/progresso.md" ]; then
+    echo "nova-tarefa.sh: $abs é pasta de tarefa; nova-tarefa.sh pede a pasta de trabalho, a que contém tarefas/" >&2
+    exit 2
+  fi
+fi
 
 skill=$(cd "$(dirname "$0")/.." && pwd)
 dia=$(date +%F)

@@ -187,6 +187,29 @@ roda "$P" src/com-chave.sh
 nao_tem "ficha de arquivo com chave: sem o corpo" "$(cat "$P/fichas/src__com-chave.sh.md")" "MIIEcorpofalso"
 tem "ficha de arquivo com chave: a linha-chave depois dela continua" "$(cat "$P/fichas/src__com-chave.sh.md")" "4:# TODO conferir depois da chave"
 
+# --- F-a · a pasta de trabalho (ou a tarefas/) no lugar da pasta da tarefa: código 2, nada gravado --------------
+# A pasta de trabalho fica dentro de .seiva/ (ignorada pelo git), para a recusa vir da trava e não da regra do git.
+FW=$R/.seiva/trab-f
+mkdir -p "$FW/tarefas/t9/relatorios"
+printf '# Registro\n' >"$FW/tarefas/t9/registro.md"
+FWR=$(cd -- "$FW" && pwd -P)
+roda "$FW" src/a.js
+eq "F-a · pasta de trabalho: código 2" 2 "$RC"
+eq "F-a · pasta de trabalho: stdout vazio" "" "$SAI"
+eq "F-a · pasta de trabalho: a mensagem da trava" "ficha-tecnica.sh: $FWR é pasta de trabalho (tem tarefas/); <pasta-da-tarefa> pede a pasta da tarefa, $FWR/tarefas/<tarefa>" "$ERR"
+eq "F-a · pasta de trabalho: sem fichas/" nao "$([ -e "$FW/fichas" ] && echo sim || echo nao)"
+roda "$FW" --de "$P/relatorios/batedor-1.md"
+eq "F-a · pasta de trabalho com --de: código 2" 2 "$RC"
+eq "F-a · pasta de trabalho com --de: sem trechos.md" nao "$([ -e "$FW/trechos.md" ] && echo sim || echo nao)"
+eq "F-a · pasta de trabalho com --de: sem fichas/" nao "$([ -e "$FW/fichas" ] && echo sim || echo nao)"
+roda "$FW/tarefas/." src/a.js
+eq "F-a · tarefas/ por caminho com '.': código 2" 2 "$RC"
+eq "F-a · tarefas/ por caminho com '.': a mensagem da trava" "ficha-tecnica.sh: $FWR/tarefas é a pasta tarefas/; <pasta-da-tarefa> pede uma tarefa dentro dela, $FWR/tarefas/<tarefa>" "$ERR"
+eq "F-a · tarefas/: sem fichas/" nao "$([ -e "$FW/tarefas/fichas" ] && echo sim || echo nao)"
+roda "$FW/tarefas/t9" src/a.js
+eq "F-a · controle: a pasta da tarefa dentro de tarefas/ segue como hoje" 0 "$RC"
+eq "F-a · controle: a ficha sai na pasta da tarefa" sim "$([ -f "$FW/tarefas/t9/fichas/src__a.js.md" ] && echo sim)"
+
 if [ "$erros" -ne 0 ]; then
   echo "FALHA: $erros de $n casos"
   exit 1

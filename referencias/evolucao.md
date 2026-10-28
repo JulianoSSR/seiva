@@ -11,7 +11,7 @@ No fechamento de toda tarefa N1 ou acima, uma linha:
 ```
 
 - `r p f d` são as categorias `rapido`, `padrao`, `forte` e `profundo`; entre parênteses, quantos agentes a triagem orçou. É o custo real contra o orçamento.
-- `tokens subagentes` e `orquestrador` saem da 2ª linha do `medir.sh --fechar` (tokens ponderados, com as corridas que caíram no limite). Orquestrador marcado `estimado` leva o `~` na frente. Sem o `medir.sh` (outro harness), escreva `—`, e os agentes e as rodadas servem de medida de custo.
+- `tokens subagentes` e `orquestrador` saem da 2ª linha do `medir.sh --fechar` (tokens ponderados, com as corridas que caíram no limite). Orquestrador marcado `estimado` leva o `~` na frente. Sem o `medir.sh` (outro harness), escreva `—`, e os agentes e as rodadas servem de medida de custo. Quando a 2ª linha diz "janela vazia em K de N sessão(ões)", o orquestrador dessas K sessões não foi contado. Se a sessão vazia serviu só a esta tarefa, meça de novo com `--sessao <id>` e use esse número. Se não, com K < N grave o número com `≥` na frente e cite a sessão vazia, e com K = N escreva `—`.
 - `correções` são as `C-n` do registro (abaixo).
 - Cada lente aparece com o sinal que a acionou e `confirmados/falsos`. É isso que permite dizer, depois, que um sinal nunca rende achado.
 

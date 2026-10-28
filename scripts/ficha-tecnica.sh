@@ -16,13 +16,19 @@
 #
 # Saída: uma linha "FICHAS <n> · TRECHOS <i> intervalos, <l> linhas · <pasta>" e, se houver, as citações puladas.
 # Como o enxugar, só grava em pasta ignorada pelo git e com a máscara de segredo funcionando: senão "RECUSA <motivo>"
-# e código 125, sem gravar nada. Uso errado sai com 2.
+# e código 125, sem gravar nada. Uso errado sai com 2, e inclui apontar a pasta errada: a de trabalho (a que tem
+# tarefas/) ou a própria tarefas/ no lugar da pasta da tarefa. Nesses dois casos nada é gravado (nem fichas/ nem
+# trechos.md); a mensagem diz o que apontar.
 set -uo pipefail
 umask 077
 export LC_ALL=C
 
 recusa() { printf 'RECUSA %s\n' "$1"; exit 125; }
-uso() { echo "uso: ficha-tecnica.sh <pasta-da-tarefa> [--de <relatorio>] [arquivo...]" >&2; exit 2; }
+uso() {
+  echo "uso: ficha-tecnica.sh <pasta-da-tarefa> [--de <relatorio>] [arquivo...]" >&2
+  echo "     a pasta da tarefa é <trabalho>/tarefas/<tarefa>; a pasta de trabalho ou a tarefas/ sai com 2, sem gravar nada." >&2
+  exit 2
+}
 
 aqui=$(cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P) || recusa "não achei a pasta do script"
 [ -r "$aqui/segredos.sh" ] || recusa "segredos.sh não está ao lado do ficha-tecnica.sh"
@@ -49,6 +55,22 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -d "$pasta" ] || recusa "a pasta da tarefa não existe: $pasta"
+# Trava de pasta: o script pede a pasta da tarefa. Com a pasta de trabalho (tem tarefas/) ou com a tarefas/ (o nome é
+# tarefas e alguma subpasta tem registro.md ou progresso.md), recusa com 2 antes de gravar qualquer coisa. O caminho é
+# resolvido antes: "." e ".." e link simbólico caem no mesmo lugar.
+abs=$(cd -- "$pasta" 2>/dev/null && pwd -P) || recusa "a pasta da tarefa não existe: $pasta"
+if [ -d "$abs/tarefas" ]; then
+  echo "ficha-tecnica.sh: $abs é pasta de trabalho (tem tarefas/); <pasta-da-tarefa> pede a pasta da tarefa, $abs/tarefas/<tarefa>" >&2
+  exit 2
+fi
+if [ "${abs##*/}" = tarefas ]; then
+  for sub in "$abs"/*/; do
+    if [ -f "${sub}registro.md" ] || [ -f "${sub}progresso.md" ]; then
+      echo "ficha-tecnica.sh: $abs é a pasta tarefas/; <pasta-da-tarefa> pede uma tarefa dentro dela, $abs/<tarefa>" >&2
+      exit 2
+    fi
+  done
+fi
 pasta_ignorada "$pasta" || recusa "a pasta $pasta não está ignorada pelo git (ou não deu para conferir); nada foi gravado"
 [ "$(printf 'x\n' | mascarar 2>/dev/null)" = x ] || recusa "a máscara de segredo não funciona aqui (falta sed GNU?); nada foi gravado"
 [ -z "$relatorio" ] || [ -r "$relatorio" ] || recusa "não consigo ler o relatório: $relatorio"
