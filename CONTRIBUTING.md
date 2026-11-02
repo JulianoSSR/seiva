@@ -4,7 +4,7 @@ A seiva é aberta a proposta de qualquer pessoa. Ela precisa continuar pequena, 
 
 ## O que uma proposta precisa ter
 
-1. **Um caso real** que a mudança melhora: a tarefa, o que aconteceu e o que devia ter acontecido. De preferência um escape registrado em `aprendizado.md`.
+1. **Um caso real** que a mudança melhora: a tarefa, o que aconteceu e o que devia ter acontecido. De preferência um escape registrado em `julianossr.md`.
 2. **Um caso de teste novo** em `testes/casos.md`, no formato Situação / Esperado / Reprova se.
 3. **O custo:** quantos tokens ou agentes a mais a mudança pode gastar, e em que nível.
 
@@ -20,6 +20,8 @@ A seiva é aberta a proposta de qualquer pessoa. Ela precisa continuar pequena, 
 ```bash
 bash scripts/checar-skill.sh
 ```
+
+Ele também confere a assinatura: script novo em `scripts/` leva `# seiva · JulianoSSR · MIT` na 2ª linha, logo depois do shebang.
 
 Rode também, à mão, os casos de `testes/casos.md` que a mudança toca, e diga no pull request quais rodou.
 

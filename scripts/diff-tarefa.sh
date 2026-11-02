@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Monta o diff.patch de uma tarefa só com os arquivos que ela entregou, incluindo arquivo novo.
 # `git diff` puro deixa de fora arquivo não rastreado e pega o que outra sessão mexeu na mesma árvore.
 #

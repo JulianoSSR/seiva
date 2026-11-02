@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Statusline do orçamento vivo da seiva. Só no Claude Code, e só quando o USUÁRIO a instala
 # (bloco de instalação em referencias/harness.md, seção "Orçamento vivo"). Nenhum script da seiva escreve no settings.json.
 #

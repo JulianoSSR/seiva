@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Pré-julgamento mecânico dos achados de uma rodada, antes de o orquestrador julgar.
 #
 # Uso: julgar-pre.sh <pasta-da-tarefa> <plano|codigo> [--rodada <n>] <relatorio...>

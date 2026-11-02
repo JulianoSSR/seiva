@@ -1,5 +1,18 @@
 # Registro de mudanças
 
+## 1.4.1 (2026-10-28)
+
+A assinatura da skill, pedida em 2026-10-26.
+
+- `SKILL.md`: `metadata.author: "JulianoSSR"` no frontmatter. Para o arquivo continuar com 164 linhas, as duas primeiras regras do Orquestrador enxuto viraram uma só, com o mesmo texto.
+- Os 13 scripts de `scripts/` ganham `# seiva · JulianoSSR · MIT` na 2ª linha, logo depois do shebang. Os de `testes/scripts/` ficam sem, porque o pedido era só `scripts/`.
+- `checar-skill.sh` passa a reprovar script de `scripts/` sem o cabeçalho na 2ª linha e frontmatter sem o `author`. Assim, um script novo não nasce sem assinatura sem que ninguém perceba. Dois casos novos em `testes/scripts/teste-checar-skill.sh`, e o `CONTRIBUTING.md` avisa quem for mandar script novo.
+- Quem instalou a statusline (`~/.claude/statusline-seiva.sh`) vai ver `statusline desatualizada` na linha do orçamento até rodar a linha de atualização de `referencias/harness.md` (seção Orçamento vivo). O script mudou só no comentário da assinatura, mas o `orcamento.sh` compara a cópia instalada byte a byte. O estado e o código de saída não mudam.
+- O arquivo de aprendizado passa a se chamar `julianossr.md`, com a 1ª linha `# julianossr.md · o que a seiva aprendeu neste projeto` (`SKILL.md`, etapa 9; `referencias/evolucao.md`; `CONTRIBUTING.md`; `testes/casos.md`). Projeto que já tem `aprendizado.md` continua funcionando: o orquestrador renomeia no fechamento da primeira tarefa feita com a 1.4.1 e, se achar os dois arquivos, pergunta antes de juntar (nota em `evolucao.md`, caso E4). As entradas antigas deste registro continuam citando `aprendizado.md`, porque é o nome que valia na época.
+- Custo (P1): nenhum agente nem chamada a mais; o `checar-skill.sh` lê 13 linhas a mais.
+
+Revisão: tarefa N1, construída pelo orquestrador. O diff foi revisado por um agente sonnet de contexto limpo (o orquestrador é opus), com o papel de adversário e a lente de contrato. Ele achou 2 MÉDIO, os dois corrigidos: a nota de compatibilidade mandava trocar "só a 1ª linha" do arquivo antigo, que podia ser a linha de uma tarefa; e a statusline instalada passaria a acusar versão desatualizada sem que o registro dissesse isso. Das 3 suspeitas, uma virou o aviso no `CONTRIBUTING.md`.
+
 ## 1.4.0 (2026-10-28)
 
 Scripts que respondiam errado sem avisar, o `/usage` lido sozinho e o freio da janela calibrado pela leitura da própria janela. Saiu num commit só com o que seria a 1.3.1, que não chegou a ser publicada. Três dos defeitos escaparam da revisão da 1.2.3 (escapes E-1, E-2 e E-3 do `aprendizado.md`).

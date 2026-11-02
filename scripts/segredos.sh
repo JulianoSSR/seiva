@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Funções de segredo da seiva. Carrega-se com `source`; rodado direto, só aceita --mascarar.
 #
 #   mascarar           filtro stdin -> stdout. Troca por <OMITIDO> o que parece segredo.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Fichas e trechos para os revisores: o que eles precisam do código, sem o arquivo inteiro e sem modelo nenhum.
 #
 # Uso: ficha-tecnica.sh <pasta-da-tarefa> [--de <relatorio>] [arquivo...]

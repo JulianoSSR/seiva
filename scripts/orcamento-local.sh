@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Orçamento vivo sem statusline. Lê os transcripts locais do Claude Code, que o terminal e o app desktop escrevem do
 # mesmo jeito (~/.claude/projects/**/*.jsonl), estima o uso da janela de 5 horas e mede o contexto da sessão atual.
 # Grava o resultado no formato do orcamento.json, com o campo "fonte", e passa a decisão ao scripts/orcamento.sh, que

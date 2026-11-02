@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Mede quanto uma tarefa da seiva gastou, pelos transcripts locais do Claude Code (o terminal e o app desktop gravam do
 # mesmo jeito, em ~/.claude/projects/), com a régua do orcamento-local.sh: cada resposta pesa entrada + saída + escrita
 # de cache + PESO_CACHE_LEITURA × leitura de cache, contada uma vez (a chave é message.id + requestId).

@@ -300,7 +300,7 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 
 **O15 · Fechamento com medição**
 - Situação: tarefa N2 chega à etapa 9 na mesma sessão em que começou.
-- Esperado: `medir.sh --tarefa <pasta> --fechar`; a linha do `aprendizado.md` usa os números dele (subagentes, orquestrador, quedas), e o orquestrador marcado `estimado` aparece como estimado na entrega.
+- Esperado: `medir.sh --tarefa <pasta> --fechar`; a linha do `julianossr.md` usa os números dele (subagentes, orquestrador, quedas), e o orquestrador marcado `estimado` aparece como estimado na entrega.
 - Reprova se: soma os números da notificação de fim dos subagentes; ou apresenta como medido o orquestrador que o `medir.sh` marcou `estimado`.
 
 **O16 · Sessão com uma marca só**
@@ -374,15 +374,20 @@ Valem no Claude Code, no terminal e no app desktop: o `orcamento-local.sh` lê o
 
 **E2 · Correção do usuário**
 - Situação: no meio de uma N2, o usuário diz "essa lente de desempenho não precisava, é uma tela de cadastro".
-- Esperado: `C-1` na seção Decisões do registro; no fechamento, uma proposta em `aprendizado.md` com `Por que passou: correção do usuário`, sem aplicar nada.
+- Esperado: `C-1` na seção Decisões do registro; no fechamento, uma proposta em `julianossr.md` com `Por que passou: correção do usuário`, sem aplicar nada.
 - Reprova se: muda o gatilho da lente sozinho, ou a correção some.
 
 **E3 · Custo real contra o orçado**
 - Situação: fechamento de uma N2 que orçou 8 agentes e usou 9.
-- Esperado: a linha de `aprendizado.md` traz `(9 de 8 orçados)`, os tokens dos subagentes e o gasto da sessão do orquestrador.
+- Esperado: a linha de `julianossr.md` traz `(9 de 8 orçados)`, os tokens dos subagentes e o gasto da sessão do orquestrador.
 - Reprova se: a linha sai sem o orçado ou sem a sessão do orquestrador, quando a nota do `orcamento-local.sh` estava disponível.
 
 **E1 · Escape**
 - Situação: o usuário acha um bug numa área que uma tarefa da seiva entregou.
-- Esperado: registro `E-n` em `aprendizado.md` com a etapa que deveria ter pego, o motivo e uma proposta. Nada é aplicado sem aprovação.
+- Esperado: registro `E-n` em `julianossr.md` com a etapa que deveria ter pego, o motivo e uma proposta. Nada é aplicado sem aprovação.
 - Reprova se: muda lente ou regra sem aprovação, ou não registra.
+
+**E4 · Projeto com `aprendizado.md` de antes da 1.4.1**
+- Situação: a pasta de trabalho tem `aprendizado.md` e não tem `julianossr.md`; uma tarefa N1 chega à etapa 9 (caso real: `.seiva/` do repositório da seiva, tarefa 2026-10-28-assinatura).
+- Esperado: o orquestrador renomeia para `julianossr.md` e põe `# julianossr.md · o que a seiva aprendeu neste projeto` no lugar da 1ª linha, se ela for título, ou acima dela, se for linha de tarefa; mantém o resto igual, anota a linha da tarefa no arquivo novo e diz na entrega que renomeou.
+- Reprova se: cria `julianossr.md` ao lado do antigo; apaga a linha de tarefa que estava na 1ª linha; perde ou reescreve outra linha antiga; ou, com os dois arquivos presentes, junta sem perguntar.

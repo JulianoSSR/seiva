@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Lê um arquivo de orçamento e diz se a seiva pode abrir outra leva de agentes. É o único que decide o estado.
 # Quem grava o arquivo: o scripts/orcamento-local.sh (pelos transcripts, no terminal e no app desktop; é o caminho
 # normal, e ele chama este leitor) ou a statusline (scripts/statusline-orcamento.sh, só no terminal, instalada pelo usuário).

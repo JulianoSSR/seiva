@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Roda um comando, guarda a saída inteira na pasta da tarefa (com segredo mascarado) e devolve um resumo curto.
 # A saída longa fica em arquivo e volta para a conversa só o que cabe em até 51 linhas.
 #

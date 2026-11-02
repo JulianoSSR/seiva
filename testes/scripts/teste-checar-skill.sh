@@ -55,6 +55,16 @@ nova_copia || exit 2
 rm -rf "$T/seiva/testes/scripts"
 caso "sem testes/scripts/ passa" 0 '^OK:'
 
+# (e) script de scripts/ sem o cabeçalho da assinatura na 2ª linha reprova
+nova_copia || exit 2
+sed -i '2d' "$T/seiva/scripts/impressao.sh"
+caso "script sem a assinatura reprova" 1 "^FALHA: scripts/impressao\.sh sem '# seiva · JulianoSSR · MIT'"
+
+# (f) frontmatter sem metadata.author reprova
+nova_copia || exit 2
+sed -i '/^  author: "JulianoSSR"$/d' "$T/seiva/SKILL.md"
+caso "SKILL.md sem metadata.author reprova" 1 '^FALHA: metadata\.author'
+
 if [ "$erros" -ne 0 ]; then
   echo "FALHA: $erros de $n casos"
   exit 1

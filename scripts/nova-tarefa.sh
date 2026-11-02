@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Cria a pasta de uma tarefa com registro, plano, achados, progresso, contexto e a 1ª marca de sessão (sessoes),
 # e grava no registro a foto do `git status` de agora: o que já estava mexido antes da
 # tarefa começar é de outra sessão, não desta.

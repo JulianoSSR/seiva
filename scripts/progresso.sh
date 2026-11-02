@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Checklist das etapas 0 a 9 de uma tarefa, com o hash dos artefatos de cada etapa feita. É o que garante, numa sessão
 # nova, que etapa feita não roda de novo: quem retoma confere aqui e segue da próxima.
 #

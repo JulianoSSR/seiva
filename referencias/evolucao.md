@@ -1,6 +1,14 @@
 # Evolução: aprender com o que escapou
 
-A seiva melhora por evidência medida em uso, não por opinião. O instrumento é um arquivo só, `aprendizado.md`, na pasta de trabalho do projeto. Nada é injetado nas sessões: ele só é lido quando uma tarefa fecha, quando a triagem procura escape ou quando o usuário pede uma revisão da skill. Se o projeto tem mais de um clone em uso, a pasta de trabalho deve ficar num lugar só (o perfil diz qual), senão cada clone aprende sozinho.
+A seiva melhora por evidência medida em uso, não por opinião. O instrumento é um arquivo só, `julianossr.md`, na pasta de trabalho do projeto. Nada é injetado nas sessões: ele só é lido quando uma tarefa fecha, quando a triagem procura escape ou quando o usuário pede uma revisão da skill. Se o projeto tem mais de um clone em uso, a pasta de trabalho deve ficar num lugar só (o perfil diz qual), senão cada clone aprende sozinho.
+
+Quem cria o arquivo começa por esta linha, que diz a quem o abre o que ele guarda:
+
+```
+# julianossr.md · o que a seiva aprendeu neste projeto
+```
+
+**Projeto que já tem `aprendizado.md`.** Era o nome do arquivo até a 1.4.0, e o conteúdo vale como está. No fechamento da primeira tarefa feita com a 1.4.1 ou mais nova, o orquestrador renomeia `aprendizado.md` para `julianossr.md` e põe a linha de cima no lugar da 1ª, se ela for um título (`# ...`), ou acima dela, se não for: nenhuma versão anterior fixou a 1ª linha, e ela pode ser a linha de uma tarefa. Depois anota a linha da tarefa no arquivo novo e diz na entrega que renomeou. Se a pasta de trabalho é versionada, o nome antigo e o novo entram no bloco de commit da entrega. Até a troca, quem lê o aprendizado procura pelos dois nomes. Se os dois arquivos existem, o orquestrador não junta sozinho: mostra os dois ao usuário e pergunta.
 
 ## Linha por tarefa
 
@@ -46,7 +54,7 @@ Defeito que escapa é uma fonte de evidência; a outra é o usuário corrigindo 
 C-1: <o que a seiva fez> → <o que o usuário corrigiu> — <a regra que levou ao erro, se der para dizer>
 ```
 
-No fechamento, cada `C-n` vira uma proposta em `aprendizado.md`, no formato do escape, com `Por que passou: correção do usuário`. Se o projeto usa a memória automática do Claude Code, as memórias de tipo feedback criadas durante a tarefa também servem de fonte: são lidas no fechamento, nunca injetadas nas sessões. Nenhuma proposta se aplica sozinha.
+No fechamento, cada `C-n` vira uma proposta em `julianossr.md`, no formato do escape, com `Por que passou: correção do usuário`. Se o projeto usa a memória automática do Claude Code, as memórias de tipo feedback criadas durante a tarefa também servem de fonte: são lidas no fechamento, nunca injetadas nas sessões. Nenhuma proposta se aplica sozinha.
 
 Ferramentas que capturam correções por hook a cada mensagem e injetam regra em toda sessão (como o claude-recall) ficam de fora pela mesma razão dos hooks sempre ativos ([FONTES](../FONTES.md)): custo fixo de contexto e código de terceiro rodando a cada mensagem.
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Impressão digital curta de cada fonte de lei do perfil.
 # Serve para saber, sem reler nada, se alguma fonte mudou desde a última tarefa.
 #

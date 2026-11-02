@@ -11,7 +11,8 @@ description: |
 license: MIT
 compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo, enxugar, fichas e pré-julgamento usam jq, sed GNU e timeout.
 metadata:
-  version: "1.4.0"
+  version: "1.4.1"
+  author: "JulianoSSR"
 ---
 
 # Seiva
@@ -113,12 +114,11 @@ Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`
 - Atualize o status nos registros que o perfil manda (seção R), no mesmo trabalho. Número de item novo (bug, incidente, decisão) segue a regra de numeração da seção R; sem regra, confira o maior número em uso no arquivo como está agora, nunca pelo histórico do git, porque outra sessão pode ter acabado de usar o próximo.
 - Entregue pelas regras do projeto (seção E), por exemplo: bloco de commit para o usuário rodar, se o projeto proíbe o agente de commitar.
 - A entrega diz: o que mudou; a prova; decisões tomadas sem o usuário (`D-n`, com custo se errado); limitações e suposições; achados não corrigidos e onde ficaram registrados; categorias rebaixadas por indisponibilidade; a independência de cada revisão.
-- Rode `scripts/medir.sh --tarefa <pasta> --fechar` na sessão do orquestrador: ele grava o `medicao.md` na pasta e alimenta o histórico de custo que o `--leva` usa. Preencha "Arquivos entregues" no registro e anote uma linha em `aprendizado.md` com os números dele ([evolução](referencias/evolucao.md)).
+- Rode `scripts/medir.sh --tarefa <pasta> --fechar` na sessão do orquestrador: ele grava o `medicao.md` na pasta e alimenta o histórico de custo que o `--leva` usa. Preencha "Arquivos entregues" no registro e anote uma linha em `julianossr.md` com os números dele ([evolução](referencias/evolucao.md)).
 
 ## Orquestrador enxuto
 
-- Lê perfil, registro e relatórios; arquivo grande não é lido inteiro. Não delega o que um comando resolve.
-- Confere prova por amostra: abre o `arquivo:linha` citado ou roda de novo o comando mais barato.
+- Lê perfil, registro e relatórios; arquivo grande não é lido inteiro. Não delega o que um comando resolve. Confere prova por amostra: abre o `arquivo:linha` citado ou roda de novo o comando mais barato.
 - Cada subagente recebe o pacote de ida e nada mais. Pacote para modelo pequeno leva passos numerados.
 - Saída longa de comando passa por `scripts/enxugar.sh`; relatório longo fica em arquivo; na conversa volta no máximo 25 linhas.
 - Custo é medido, não copiado: `scripts/medir.sh --tarefa <pasta>` mede cada subagente e o orquestrador pelos transcripts, com as corridas que caíram no limite. O número da notificação de fim do subagente perde a leitura de cache e as corridas que caíram: não compare custo por ele. Na descrição de cada agente (campo `description` do Agent), comece pelo papel (`Construtor: ...`): é por ela que a medição separa os papéis. Orçamento da triagem estourado: avise antes de continuar.

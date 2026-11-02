@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# seiva · JulianoSSR · MIT
 # Confere a própria skill antes de publicar uma versão: frontmatter, tamanho e links internos.
 # Uso: bash scripts/checar-skill.sh   (a partir da raiz da skill)
 set -u
@@ -43,8 +44,16 @@ for s in scripts/*.sh testes/scripts/*.sh; do
   bash -n "$s" || falha "sintaxe em $s"
 done
 
+# Assinatura: metadata.author no frontmatter e o cabeçalho na 2ª linha de cada script de scripts/ (a 1ª é o shebang).
+awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' SKILL.md | grep -qx '  author: "JulianoSSR"' ||
+  falha "metadata.author no frontmatter do SKILL.md ausente ou diferente de \"JulianoSSR\""
+for s in scripts/*.sh; do
+  [ -e "$s" ] || continue
+  [ "$(sed -n 2p "$s")" = '# seiva · JulianoSSR · MIT' ] || falha "$s sem '# seiva · JulianoSSR · MIT' na 2ª linha"
+done
+
 if [ "$falhas" -eq 0 ]; then
-  echo "OK: description $tam caracteres, SKILL.md $linhas linhas, links e scripts em ordem"
+  echo "OK: description $tam caracteres, SKILL.md $linhas linhas, links, scripts e assinatura em ordem"
 else
   echo "$falhas falha(s)"
   exit 1
