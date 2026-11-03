@@ -4,6 +4,8 @@ Gerado pela seiva em <AAAA-MM-DD>, a partir das fontes listadas no fim. Cita, n�
 
 Repositório vivo: `<caminho absoluto>` · pasta de trabalho da seiva: `<.claude/seiva ou .seiva>`
 
+Varredura do Resina: nunca <ou `AAAA-MM-DD · <caminho do relatório>`, `recusada em AAAA-MM-DD`, `adiada em AAAA-MM-DD (orçamento)`; ver terreno, seção 5>
+
 ## L · Inegociáveis
 - L1 <frase curta, fiel à fonte> — `<arquivo:linha>`
   - Como se mede: <teste, comando ou troca que prova a violação, se a fonte disser>

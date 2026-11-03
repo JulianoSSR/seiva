@@ -43,7 +43,12 @@ Leia o pedido, o relatório do batedor, o plano e, na etapa 8, o diff. **Anote n
 | [contrato](../papeis/lentes/contrato.md) | mudança de API ou de formato que outro cliente consome (app já instalado, integração, outro serviço, exportação), campo removido ou renomeado, versão |
 | lentes do projeto | superfícies S do perfil. Se o projeto tem agente para ela e o arquivo do agente ainda existe, use o agente do projeto; se sumiu, use a lente da seiva mais próxima e anote. |
 
-**Invasor:** varredura de segurança do sistema inteiro, a pedido do usuário ou em tarefa de segurança N3 ([papel](../papeis/invasor.md)). O relatório dele passa por um revisor de segurança antes de virar conserto.
+**Mestre invasor (Resina)** ([papel](../papeis/invasor.md)), `forte` nos dois modos:
+
+- **Varredura** do sistema inteiro: na criação do perfil, uma vez em projeto cuja linha `Varredura do Resina` do perfil diz `nunca` ou `adiada` ou não existe, a pedido do usuário e em N3 cujo objeto é segurança (endurecer o sistema, fechar brecha; N3 que só passa por permissão ou migration não conta). Conta 2 agentes à parte (o Resina e o revisor), ditos na triagem numa linha própria. Antes, `orcamento-local.sh --leva "invasor:opus revisor:sonnet"`; com `restrito` ou `NÃO CABE`, a varredura fica para depois e o perfil grava `adiada`. Com `sem contar invasor:opus` (menos de 3 corridas no histórico, o caso da 1ª varredura), o custo é desconhecido: diga isso ao usuário e pergunte antes. O único piso medido é o ensaio da 1.5.0, cerca de 357 mil tokens ponderados com o Resina em sonnet sobre 6 scripts (`CHANGELOG.md`); em opus e sobre um sistema inteiro custa mais.
+- **Modo mudança**: no portão do código de N2 e N3 quando a lente de segurança acionou, na triagem ou pelo diff, no lugar dela. Em N2 é a exceção à regra de que a lente que atacou o plano não volta no diff ([revisão](revisao.md)): o Resina entra mesmo assim. Lente e Resina juntos no mesmo diff dobram o custo e não acham mais. No diff do conserto de uma varredura da mesma tarefa revisa a lente de segurança, sem um segundo Resina. Soma 2 agentes ao portão em N2 (o Resina e o revisor) e 1 em N3 (o revisor), e o Resina conta no teto de revisores do portão.
+
+O relatório passa por um revisor `padrao` de contexto limpo antes de virar conserto.
 
 **Adversário:** revisa o plano em N2 e N3 e o diff em N2 e N3. Em N2, no diff, só entra junto com ele a lente de um sinal que o plano não previa ([revisão](revisao.md)). Em N1, se nenhuma lente acionar no diff, o adversário é o revisor.
 

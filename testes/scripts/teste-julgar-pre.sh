@@ -569,6 +569,54 @@ roda "$JW/tarefas/2026-01-01-uma" plano --rodada 1 "$JW/rel.md"
 eq "J-a · controle: a pasta da tarefa dentro de tarefas/ segue como hoje" 0 "$RC"
 tem "J-a · controle: o achado entra no achados.md da tarefa" "$(cat "$JW/tarefas/2026-01-01-uma/achados.md")" "A-1"
 
+# JP-R · relatório do Mestre invasor (Resina): mapa de portas, caminhos com "→ A-n" e o PLANO DE CORREÇÃO, que cita
+# só o ID. Cada achado conta uma vez e nada vira aviso de fora do formato.
+DR=$(nova_tarefa jpr)
+cat >"$DR/relatorios/resina.md" <<'FIM'
+STATUS: concluído
+COMANDOS RODADOS:
+- grep -n 'query' a.js
+FALHA CONHECIDA: não coberta (sem ecossistema de dependências)
+MAPA DE PORTAS:
+- POST /itens · usuário logado · conferência em a.js:10
+- GET /itens/:id · usuário logado · sem conferência
+CAMINHOS TENTADOS:
+- passar-se por outro / id na URL — ABERTO → A-1
+- injeção / consulta montada — ABERTO → A-2
+- falha que abre / middleware — fechado (a.js:12 devolve 401 no erro)
+ACHADOS:
+[A-1] CRÍTICO · segurança · confiança 9
+Onde: a.js:20
+Defeito: a rota devolve o item sem conferir o dono
+Prova: a.js:20 busca pelo id sem filtro de dono
+Correção sugerida: filtrar pelo dono
+
+[A-2] ALTO · segurança · confiança 8
+Onde: a.js:31
+Defeito: a busca monta a consulta com o texto recebido
+Prova: a.js:31 concatena o parâmetro
+Correção sugerida: consulta parametrizada
+PLANO DE CORREÇÃO:
+1. A-1 → filtrar pelo dono em a.js:20 · teste: outro usuário recebe 404
+2. A-2 → consulta parametrizada em a.js:31 · teste: o texto com aspas volta como texto
+SUSPEITAS: nenhuma
+PERGUNTAS: nenhuma
+FIM
+roda "$DR" codigo --rodada 1 "$DR/relatorios/resina.md"
+eq "JP-R · código 0" 0 "$RC"
+tem "JP-R · dois achados, cada um uma vez" "$SAI" "2 achados (1 CRÍTICO, 1 ALTO)"
+nao_tem "JP-R · o plano de correção não vira aviso" "$SAI" "fora do formato"
+eq "JP-R · achados.md com A-1 e A-2" "A-1 A-2" "$(grep -oE '^- A-[0-9]+' "$DR/achados.md" | sed 's/^- //' | sort -t- -k2,2n | paste -sd' ' -)"
+
+# JP-R2 · 2º relatório do Resina na mesma tarefa, com achados.md já preenchido (A-1 e A-2). O pacote trouxe
+# PRIMEIRO ID: A-3, e o relatório cita A-3 e A-4 no plano de correção: são os IDs que o julgar-pre.sh grava.
+sed -e 's/A-2/A-4/g' -e 's/A-1/A-3/g' "$DR/relatorios/resina.md" >"$DR/relatorios/resina-2.md"
+roda "$DR" codigo --rodada 2 "$DR/relatorios/resina-2.md"
+eq "JP-R2 · código 0" 0 "$RC"
+nao_tem "JP-R2 · o plano de correção não vira referência" "$SAI" "Referências a achados"
+eq "JP-R2 · achados.md com A-1 a A-4" "A-1 A-2 A-3 A-4" "$(grep -oE '^- A-[0-9]+' "$DR/achados.md" | sed 's/^- //' | sort -t- -k2,2n | paste -sd' ' -)"
+eq "JP-R2 · o A-3 gravado é o achado que o relatório chama de A-3" 1 "$(grep -cE '^- A-3 · .*a\.js:20' "$DR/achados.md")"
+
 if [ "$erros" -ne 0 ]; then
   echo "FALHA: $erros de $n casos"
   exit 1

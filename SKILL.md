@@ -11,7 +11,7 @@ description: |
 license: MIT
 compatibility: Subagentes com modelo próprio no Claude Code, Codex CLI, Gemini CLI, Cursor e OpenCode; modo sequencial nos demais. Precisa de git e bash; orçamento vivo, enxugar, fichas e pré-julgamento usam jq, sed GNU e timeout.
 metadata:
-  version: "1.4.1"
+  version: "1.5.0"
   author: "JulianoSSR"
 ---
 
@@ -57,7 +57,7 @@ Os níveis estão em [triagem](referencias/triagem.md). Na dúvida entre dois, u
 
 1. Confirme que o repositório é o vivo. **Antes** dos comandos, releia o que as instruções do projeto e a memória da sessão dizem sobre onde ele fica. Depois rode `git rev-parse --show-toplevel`, `git log -1 --format='%h %cs %s'` e `git status --short`. Pare e avise se o caminho diverge do que a memória cita, ou se o último commit é antigo demais para o que se sabe do projeto. Um repositório git válido não prova que é o certo. Git recusando por "dubious ownership": veja [terreno](referencias/terreno.md), sem mexer na configuração global.
 2. Pasta de trabalho: `.claude/seiva/` quando o git já ignora `.claude/`; senão `.seiva/`, e pergunte ao usuário se ela deve ser ignorada ou versionada.
-3. Perfil: se `perfil.md` existe, rode `scripts/impressao.sh` sobre as fontes listadas nele. Impressões iguais: use o perfil como está. Diferentes: refaça só as seções da fonte que mudou. Sem perfil: crie seguindo [terreno](referencias/terreno.md). Na criação, e sempre que uma atualização mudar as seções L, P, V ou E, mostre ao usuário o que mudou antes de usar. Um erro no perfil se propaga para todos os agentes.
+3. Perfil: se `perfil.md` existe, rode `scripts/impressao.sh` sobre as fontes listadas nele. Impressões iguais: use o perfil como está. Diferentes: refaça só as seções da fonte que mudou. Sem perfil: crie seguindo [terreno](referencias/terreno.md). Na criação, e sempre que uma atualização mudar as seções L, P, V ou E, mostre ao usuário o que mudou antes de usar. Um erro no perfil se propaga para todos os agentes. Na criação, e uma vez em perfil cuja linha `Varredura do Resina` diz `nunca` ou `adiada` ou não existe, ofereça a varredura da etapa 8 ([terreno](referencias/terreno.md)).
 4. Tarefa em curso: com "retome <caminho>", com "continue" ou "tentar novamente", ou numa sessão que voltou de pausa por limite de uso, siga [retomada](referencias/retomada.md) sem esperar pedido: `scripts/progresso.sh <pasta-de-trabalho> pendentes`, depois só o `contexto-tarefa.md` e o `conferir`. Etapa feita não roda de novo.
 
 ### 1 · Triagem
@@ -107,7 +107,7 @@ Verificador ([papel](papeis/verificador.md)): outro agente que não o implementa
 
 Monte o diff com `scripts/diff-tarefa.sh <pasta-da-tarefa> <arquivos entregues>`. O script inclui arquivo novo e deixa de fora o que outra sessão mexeu. Recalcule as lentes pelo diff real, porque ele pode tocar mais do que o plano previa. Em N1, um revisor. Em N2, o adversário revisa o diff em uma rodada; lente só entra com sinal novo no diff, que o plano não previa; achado do portão do plano é conferido pelo ID em uma linha (`A-3 → mitigado em arquivo:linha`), sem lente nova; e a 2ª rodada só abre por CRÍTICO confirmado. Em N3, lentes e adversário, até 3 rodadas. O julgamento segue a etapa 5 (`julgar-pre.sh <pasta> codigo`); correções voltam ao implementador.
 
-**Varredura de segurança (invasor).** Quando o usuário pedir uma varredura do sistema, e não de uma mudança só, ou quando a tarefa for de segurança em N3, o **invasor** ([papel](papeis/invasor.md)) ataca o código como quem quer invadir, vazar dado e derrubar o sistema, e devolve um relatório de conserto. Ataca o código, nunca o sistema no ar. O relatório passa por um revisor de segurança de contexto limpo, que confirma, refuta ou marca como incerto cada brecha. Só o confirmado vira conserto, pelo caminho normal: etapa 5 para julgar, 6 para construir, 7 e 8 para provar. Brecha que mexe em permissão, isolamento entre clientes, migration ou segredo passa pelo usuário antes do código, salvo quando ele já autorizou o fluxo de conserto. Categoria `forte` para o invasor e `padrao` para o revisor.
+**Varredura de segurança (Resina).** O **mestre invasor**, apelidado Resina ([papel](papeis/invasor.md)), ataca o código como quem quer invadir, vazar dado e derrubar o sistema, e devolve plano de correção. Só lê, sem rede e nunca contra o sistema no ar. Modos e gatilhos: [triagem](referencias/triagem.md). Um revisor de contexto limpo julga cada brecha, e só a confirmada vira conserto pelas etapas 5 a 8; a que mexe em permissão, isolamento entre clientes, migration ou segredo passa pelo usuário antes, salvo conserto já autorizado. Resina `forte`, revisor `padrao`; a descrição começa por `Mestre invasor (Resina):`.
 
 ### 9 · Entregar e aprender
 

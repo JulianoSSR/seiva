@@ -611,6 +611,24 @@ tem "M-h · aviso de outro id, id parecido ou citação em resultado de ferramen
 tem "M-h · idem: (rodando) no md" "$(md)" "300 (rodando)"
 eq "M-h · idem: fora do histórico" "" "$(jq -r 'select(.agente == "a2") | .agente' "$H")"
 
+# --- S7 · o Mestre invasor (Resina) conta como invasor, e o revisor do relatório como revisor ---------------
+# A descrição começa por "Mestre invasor (Resina):" e cita "revisor" mais adiante: vale a 1ª chave da descrição.
+novo
+base
+msg "$D/agent-a4.jsonl" "PAPEL: mestre invasor (Resina). Pasta $NOME"
+u "$D/agent-a4.jsonl" a4x 1500 200 0 0 0
+meta "$D/agent-a4.meta.json" "Mestre invasor (Resina): varredura dos scripts, o revisor confere depois"
+msg "$D/agent-a5.jsonl" "PAPEL: revisor do relatório do Resina. Pasta $NOME"
+u "$D/agent-a5.jsonl" a5x 1400 100 0 0 0 claude-sonnet-teste
+meta "$D/agent-a5.meta.json" "Revisor do relatório do Resina: confirma ou refuta cada brecha"
+velho "$D"/agent-a4.jsonl "$D"/agent-a5.jsonl
+roda --tarefa "$P" --sessao "$S1"
+eq "S7 · código 0" 0 "$RC"
+tem "S7 · md: o Resina como invasor" "$(md)" "| invasor | opus-teste |"
+tem "S7 · md: o revisor do relatório como revisor" "$(md)" "| revisor | sonnet-teste |"
+eq "S7 · histórico: papel do Resina" invasor "$(jq -r 'select(.agente == "a4") | .papel' "$H")"
+eq "S7 · histórico: papel do revisor" revisor "$(jq -r 'select(.agente == "a5") | .papel' "$H")"
+
 # --- o histórico de verdade não mudou ---------------------------------------------------
 eq "custos.jsonl de verdade não mudou (hash)" "$custos_real" "$(sha256sum "$cache_real/custos.jsonl" 2>/dev/null | cut -c1-64)"
 
