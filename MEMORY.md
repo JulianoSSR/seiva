@@ -29,7 +29,6 @@ Próxima ação: Claude Code deve realizar revisão independente do diff e dos t
 - Continuidade completa em `.seiva/HANDOFF.md` (privado, não commitar). O usuário quer seguir este mesmo trabalho em outra sessão.
 - Validação final: 180 testes Python, 67 de aprendizado e 11 suítes shell; exit 0, 32,217 s. Evidência: `.seiva/evidencias-evolucao/validacao-seis-capacidades.json`.
 - Pendência de embalagem: atualizar manifesto/resultados/patch integral, ajustar identificação final no relatório e preparar o bloco de commit pessoal. Código e testes já concluídos; não repetir trabalho sem necessidade.
-- O usuário informou túnel aberto; destino e saúde não verificados, nenhum uso presumido.
 
 
 ## Fechamento dos artefatos em 2026-11-09
@@ -37,4 +36,9 @@ Próxima ação: Claude Code deve realizar revisão independente do diff e dos t
 - Relatório e resultados públicos atualizados para 180 testes Python (67 de aprendizado), 11 suítes shell, 32,217 s; sem nova execução integral ou alteração de implementação.
 - Manifesto em `docs/validacao/estado-final.json`; patch integral e prova de aplicação/reversão em cópia temporária em `.seiva/evidencias-evolucao/patch-validacao.json`. Bloco pessoal em `bloco-commit.sh` na mesma pasta.
 - Próxima ação: revisão independente do Claude Code conforme relatório; usuário confere e executa o bloco. Nenhum commit, push ou envio de propostas foi executado.
-- Túnel confirmado pelo usuário como acesso ao Ciclo Arboris; não utilizado nesta finalização da Seiva.
+
+## Revisão do Claude Code em 2026-11-09
+
+- Veredito sobre o `9d773be`: mudanças necessárias, com dez defeitos confirmados. Os dois de severidade alta são o `conferir` que quebra em tarefa legada e o monitor que trava com mensagem `<synthetic>` do Claude Code. Detalhes e reproduções em `RELATORIO_PARA_REVISAO_CLAUDE_CODE.md`, seção "Revisão do Claude Code".
+- A skill instalada é um link para este clone: o que está em `main` vale na hora em todas as sessões.
+- Correções dos dez itens preparadas e validadas (189 testes Python, 11 suítes shell), versão 1.6.0, sem commit. Deduplicação de fichas pelo meio-termo escolhido pelo usuário: ficha enviada pode voltar em versão nova, recusa vale sempre. Commit e push são do usuário.

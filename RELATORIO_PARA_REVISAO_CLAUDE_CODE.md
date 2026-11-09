@@ -1,13 +1,13 @@
 # Relatório para revisão independente do Claude Code
 
-**Implementação e testes concluídos: 180 testes Python e 11 suítes shell passaram. Artefatos finais atualizados; revisão do Claude Code pendente.**
+**A revisão independente do Claude Code (2026-11-09) concluiu "mudanças necessárias": dez defeitos confirmados, dois deles de severidade alta e já ativos nas sessões do usuário.** Os 180 testes Python e as 11 suítes shell passam no `9d773be`, mas não cobrem os cenários abaixo. Detalhes, reproduções e correções na seção [Revisão do Claude Code](#revisão-do-claude-code-2026-11-09).
 
-**Data:** 2026-11-09, America/Sao_Paulo. **Estado:** implementação preparada; revisão do Claude Code pendente. Não houve commit, push, publicação, instalação global, hook ou serviço persistente.
+**Data:** 2026-11-09, America/Sao_Paulo. **Estado:** entrega enviada no commit `9d773be`; revisão do Claude Code feita, com mudanças necessárias. Não houve commit, push, publicação, instalação global, hook ou serviço persistente.
 
 ## Base e identificação da entrega
 
-- Repositório local: `/home/julianossr/projetos/seiva`, remoto `https://github.com/JulianoSSR/seiva.git`.
-- Commit-base e HEAD final: `a181dc83b913f8123875ac8544f97e8a1c211ef2`.
+- Repositório local: clone de trabalho do usuário, remoto `https://github.com/JulianoSSR/seiva.git`.
+- Commit-base: `a181dc83b913f8123875ac8544f97e8a1c211ef2`. Entrega: commit `9d773be`, já em `main`.
 - A primeira consulta encontrou árvore limpa. O índice permaneceu sem alterações. Não se atribuiu autoria por `git status`: a divisão de escrita foi explícita por arquivos entre as instâncias desta sessão.
 - Identificação de conteúdo: `docs/validacao/estado-final.json`, com SHA-256 por arquivo e digest do conjunto. Exclui este relatório e o próprio manifesto para evitar autorreferência. O relatório não é um certificado independente.
 - Diff para revisar: `.seiva/evidencias-evolucao/diff-revisao.patch`, montado após congelar os arquivos e verificado por aplicação numa cópia temporária da base. Essa entrega começou antes de o contrato novo existir: sua proveniência é a árvore inicialmente limpa, o commit-base e a divisão registrada nesta sessão; não é um snapshot retroativo produzido pelo novo script.
@@ -75,7 +75,7 @@ Os nomes dos comandos básicos foram mantidos; a exigência de prova é uma migr
 Comando completo, sem chamadas de modelo:
 
 ```bash
-cd /home/julianossr/projetos/seiva
+cd seiva   # raiz do clone
 bash scripts/testar.sh
 ```
 
@@ -206,6 +206,82 @@ git apply --reverse --binary .seiva/evidencias-evolucao/diff-revisao.patch
 ```
 
 Uma falha interrompe a reversão; não force nem apague arquivos de outra sessão. O patch não remove evidências privadas nem configurações preexistentes, e não modifica o índice. Não há publicação a desfazer.
+
+## Revisão do Claude Code (2026-11-09)
+
+**Veredito: mudanças necessárias.** A revisão foi feita por outra instância, em outro harness e outro modelo (Claude Code), sobre o diff `a181dc8..9d773be`. Ela não aceitou este relatório como prova: leu o código novo, reproduziu cada defeito em cópia temporária e não usou dado de produção. As linhas abaixo se referem ao `9d773be`.
+
+**Contexto que o relatório omitiu:** `~/.claude/skills/seiva` é um link simbólico para o clone. "Sem instalação global" é verdade, mas o push fez o comportamento novo valer na hora em todas as sessões do Claude Code do usuário, inclusive nas tarefas em curso do Ciclo Arboris.
+
+### O que foi reproduzido
+
+| Item | Resultado |
+|---|---|
+| `bash scripts/testar.sh` numa cópia limpa do `9d773be` | Saída 0: 180 testes Python, 11 suítes shell (1.162 casos), `checar-skill` em ordem; 58,4 s |
+| RPC real do Codex, revisões internas, prévias do SVG | Não reproduzidos; só registrados |
+| Gemini, OpenCode, Cursor em aplicativo real | Não testados por nenhuma das duas partes |
+
+### Onde a entrega falhou
+
+| # | Sev. | Local no `9d773be` | Cenário que reproduz | O que aconteceu | Por que os testes não pegaram |
+|---|---|---|---|---|---|
+| 1 | Alta | `scripts/estado_tarefa.py:110-129`, `:412-415`, `:468-473` | Cópia das tarefas reais do Ciclo (`.claude/seiva/tarefas/*`) e `progresso.sh <tarefa> conferir` | Sai com 2: `artefato fora do escopo: ../../perfil.md`. A migração deixa `repository` vazio e o perfil da pasta de trabalho fica fora das raízes. Antes de falhar, grava `estado.json` e reescreve o `progresso.md`, que perde o cabeçalho. `pendentes` aponta "0 Terreno · feita" e esconde "6 Construir · em-curso: adendo D-41 parcial". Na base `a181dc8`, a mesma cópia responde `PROXIMA 6 Construir` | Os testes de migração usam artefatos dentro da pasta da tarefa; nenhum usa o perfil compartilhado, que era o padrão da etapa 0 na base |
+| 2 | Alta | `scripts/adaptadores.py:44-49`, `:189`; `scripts/monitor.py:140-144` | Transcript do Claude Code com mensagem `"model": "<synthetic>"` (23 linhas em 8 dos 40 transcripts reais mais recentes da máquina) | `_label` recusa `<`/`>`, o `ingest` aborta a coleta inteira e não avança o offset: a fonte fica bloqueada para sempre. Sem a linha, a mesma fonte soma input 30 e output 12 | O parser do Claude foi validado só com fixtures, sem transcript real; o relatório reconhece isso na matriz |
+| 3 | Média | `scripts/aprendizado.py:504` | Commit que troca a ficha A pela ficha B em `insights/incoming/` | `git diff --name-only` usa detecção de renomeação e lista só B; `--no-renames --name-status` mostra `D A` e `A B`. O validador aceita, embora o código pretenda recusar exclusão | Nenhum teste combina exclusão e adição semelhantes no mesmo lote |
+| 4 | Média | `scripts/estado_tarefa.py:387-389` | Marcar as dez etapas como `pulada`, sem motivo nem artefato | `conferir` sai com 0, `PROXIMA nenhuma`, e a tarefa some de `pendentes`. A regra "prova antes de concluir" é contornada | Só se testou `pulada` com motivo |
+| 5 | Média | `scripts/estado_tarefa.py:86-87`, `:208-219`; `scripts/nova-tarefa.sh:83` | Repositório com submódulo e `nova-tarefa.sh` | Sai com 2 (`o escopo exige arquivo regular`), porque o gitlink é um diretório. A pasta da tarefa fica pela metade, sem `estado.json`; repetir dá `já existe` | Nenhum repositório de teste tem submódulo |
+| 6 | Média | `scripts/aprendizado.py:426`, `:430-432`, `:280-285` | Autorizar, depois simular a rede caindo já na busca de duplicata, antes de qualquer `issue create` | O status vira `incerto` embora nada tenha sido publicado. Daí em diante, preparar, refletir e enviar são recusados, e `conciliar` exige uma issue que não existe. Como a equivalência é só por categoria, um evento novo da mesma categoria responde `duplicada` para sempre; o mesmo vale depois de `recusado`. Na prática, são seis fichas em toda a vida da instalação | Os testes de falha de rede param na marcação `incerto` e não verificam se há saída dela |
+| 7 | Baixa | `SKILL.md` (regra removida); `scripts/medir.sh:265` | Ler as duas versões | A regra "a descrição do agente começa pelo papel" saiu do SKILL, mas o `medir.sh` ainda separa papéis pela primeira palavra da descrição. Só o Resina manteve o prefixo. O `medir.sh` não foi executado na revisão | `checar-skill` não confere essa dependência |
+| 8 | Baixa | `scripts/nova-tarefa.sh:63`, `scripts/estado_tarefa.py:180-181` | Criar tarefa nova | Toda tarefa nova sai com `migrated_from: progresso.md`, porque o molde é copiado antes do `init` | Nenhum teste olha esse campo em tarefa nova |
+| 9 | Baixa | `SKILL.md` (`version`), `.claude-plugin/plugin.json` | Ler a versão | Continua 1.5.0 com contrato incompatível (`marcar feita` exige `--attempt` ou `--evidence`). A ficha de aprendizado manda `versao_seiva` 1.5.0 para código que não é o 1.5.0 publicado | Não se aplica |
+| 10 | Baixa | `MEMORY.md`, este relatório | Ler os arquivos publicados | Notas de sessão (túnel, Ciclo Arboris, transferência) e caminho local absoluto foram para o repositório público. Não há segredo, mas é metadado de sessão | Não se aplica |
+
+### Observações sem defeito confirmado
+
+- **Seleção por capacidade:** `capacidades` devolve `models: []` para o Claude e deixa `tools` e `clean_context` nulos. Sem um arquivo escrito à mão, `selecionar` não escolhe nada no Claude Code e descarta toda tarefa `independent`, inclusive revisor. Hoje a seleção só funciona de fato com o Codex, e isso precisa estar dito assim.
+- **Base completa:** num repositório sintético de 15 MB, o `estado.json` ficou com 20 MB, e cada comando levou cerca de 0,4 s. O desempenho está bom. Duas coisas pesam: o arquivo inteiro é regravado a cada marcação, e entram bytes de arquivo não rastreado e não ignorado, o que pode copiar um segredo mal ignorado para a pasta privada.
+- **Valor da ficha:** o payload só tem texto de catálogo. A privacidade está bem amarrada, porque a validação exige as frases exatas e só a versão varia. Em troca, o mantenedor recebe quase nenhuma informação, e o custo de reflexão e consentimento não foi medido.
+- **Robustez de `pendentes`:** um único `estado.json` inválido derruba a listagem de todas as tarefas.
+- **Hash legado:** a migração aceita hash de 12 a 64 caracteres, mas a validação seguinte só aceita 12 ou 64.
+
+### O que se sustentou
+
+- Consentimento: o título deriva do payload, há hashes de título, corpo e fontes, e tudo é relido antes do `create`. Os achados P1 e P2 da revisão interna continuam corrigidos.
+- Recepção: o validador lê blobs sem checkout, e o pacote de triagem não executa, não aprova e não faz merge.
+- O diff atômico preserva o `diff.patch` anterior quando falha.
+- O Resina manteve nome, papel defensivo e julgamento por outro agente.
+
+### Correções preparadas pelo Claude Code
+
+**Os dez itens foram corrigidos e validados na árvore de trabalho, ainda sem commit.** O usuário escolheu a regra de deduplicação descrita no item 6.
+
+| # | Correção | Arquivos |
+|---|---|---|
+| 1 | Raízes de artefato incluem o repositório da própria tarefa; a migração grava `repository`; `conferir` só lê tarefa legada; a 1ª gravação guarda `progresso.legado.md`; artefato fora das raízes vira `FORA-DO-ESCOPO` em vez de exceção; `PROXIMA` e `pendentes` apontam a etapa real e listam o legado sem prova à parte; `pendentes` mostra a tarefa inválida sem derrubar as outras; a validação aceita hash de 12 a 64 caracteres, como a migração | `scripts/estado_tarefa.py` |
+| 2 | Mensagem `<synthetic>` do Claude Code é ignorada | `scripts/adaptadores.py` |
+| 3 | `validar-lote` usa `--no-renames --name-status` e recusa tudo que não for `A` | `scripts/aprendizado.py` |
+| 4 | `pulada` exige motivo; sem motivo, não vale como etapa resolvida | `scripts/estado_tarefa.py` |
+| 5 | Gitlink registrado como `160000` (só o que o `git ls-files -s` marca assim) e recusado como escopo de arquivo; `nova-tarefa.sh` apaga a pasta que criou se o `init` falhar | `scripts/estado_tarefa.py`, `scripts/nova-tarefa.sh` |
+| 6 | Falha antes do `create` devolve a ficha a `local` e anula a autorização; `conciliar-ausente --confirmo-que-nao-existe` tira do `incerto`. Deduplicação por **meio-termo**, decidido pelo usuário: mesma categoria é a mesma ficha, exceto quando a anterior foi enviada e a versão mudou; recusa vale em qualquer versão | `scripts/aprendizado.py`, `referencias/aprendizado.md` |
+| 7 | A regra da descrição começando pelo papel volta ao SKILL, na frase do `medir.sh` | `SKILL.md` |
+| 8 | `nova-tarefa.sh` não copia o molde de `progresso.md`; o arquivo nasce do `estado.json` | `scripts/nova-tarefa.sh` |
+| 9 | Versão 1.6.0 no SKILL e no `plugin.json`; CHANGELOG com a seção 1.6.0 | `SKILL.md`, `.claude-plugin/plugin.json`, `CHANGELOG.md` |
+| 10 | Caminhos absolutos saíram deste relatório; notas de túnel saíram do `MEMORY.md` | este relatório, `MEMORY.md` |
+
+**Validação (reproduzida pelo Claude Code):** `bash scripts/testar.sh` saiu com 0, com 189 testes Python e 11 suítes shell (`teste-nova-tarefa.sh` foi de 30 para 37 casos), `checar-skill` em ordem e `git diff --check` limpo.
+
+- **Testes novos:** tarefa legada com `../../perfil.md` retomando na etapa real; `pendentes` com uma tarefa inválida; `pulada` sem motivo; submódulo; linha `<synthetic>`; troca de ficha no lote; saída do `incerto`; ficha enviada voltando em versão nova; recusa valendo em versão nova; tarefa nova sem `migrated_from`; `init` que falha sem deixar pasta.
+- **Testes antigos com nova expectativa** (comportamento mudado de propósito, nenhum perdeu proteção): três de falha de rede esperam `local` quando a falha vem antes do `create`, e o de conciliação chega ao `incerto` por falha durante o `create`; quatro de lote simulam `--name-status`; o de migração confere que `conferir` não grava e que a 1ª marcação guarda o original.
+- **Reproduções originais repetidas contra a árvore corrigida:** nas cópias das tarefas do Ciclo, `conferir` responde `PROXIMA 6 Construir` (ou `3 Propor`), sem criar `estado.json` e sem tocar o `progresso.md`. O parser não recusa nenhum dos 40 transcripts reais, e o `coletar` com linha `<synthetic>` soma input 30 e output 12. O lote com troca de ficha é recusado. A queda de rede antes do `create` deixa a ficha em `local`.
+
+**Limites que continuam:**
+
+- `conferir` em tarefa legada sai com 1 enquanto houver etapa sem prova. Para fechar, cada etapa precisa ser marcada de novo com `--evidence` ou `--attempt`.
+- O monitor continua abortando por qualquer outra linha completa que não seja JSON válido; só o caso `<synthetic>` foi tratado.
+- `conciliar-ausente` confia na conferência manual da pessoa, sem consultar o GitHub.
+- `docs/validacao/estado-final.json` e `resultados.json` descrevem o `9d773be` e não foram regenerados para estas correções.
+
+Lição para quem constrói: os testes cobriram bem os contratos novos, mas quase nunca rodaram contra dado real ou contra o formato que a versão anterior produzia. Três dos defeitos (1, 2 e 5) aparecem na primeira tentativa com tarefas reais, transcripts reais ou um repositório com submódulo. Antes de declarar compatibilidade, rode os scripts novos contra uma cópia de `.claude/seiva` de um projeto em uso e contra transcripts do próprio aplicativo.
 
 ## Pedido ao Claude Code
 
