@@ -1,0 +1,5 @@
+# Artefatos privados de execução e cache local
+.seiva/
+.claude/seiva/
+__pycache__/
+*.pyc

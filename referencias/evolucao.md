@@ -1,6 +1,6 @@
 # Evolução: aprender com o que escapou
 
-A seiva melhora por evidência medida em uso, não por opinião. O instrumento é um arquivo só, `julianossr.md`, na pasta de trabalho do projeto. Nada é injetado nas sessões: ele só é lido quando uma tarefa fecha, quando a triagem procura escape ou quando o usuário pede uma revisão da skill. Se o projeto tem mais de um clone em uso, a pasta de trabalho deve ficar num lugar só (o perfil diz qual), senão cada clone aprende sozinho.
+A seiva melhora por evidência medida em uso, não por opinião. O instrumento é um arquivo só, `julianossr.md`, na pasta de trabalho do projeto. É estado privado de execução, em pasta ignorada pelo git; não copiar conteúdo para documentação pública. Documentos e avaliações sanitizadas podem ser versionados. Preserve registros existentes. Nada é injetado nas sessões: ele só é lido quando uma tarefa fecha, quando a triagem procura escape ou quando o usuário pede uma revisão da skill. Se o projeto tem mais de um clone em uso, a pasta de trabalho deve ficar num lugar só (o perfil diz qual), senão cada clone aprende sozinho.
 
 Quem cria o arquivo começa por esta linha, que diz a quem o abre o que ele guarda:
 
@@ -8,7 +8,7 @@ Quem cria o arquivo começa por esta linha, que diz a quem o abre o que ele guar
 # julianossr.md · o que a seiva aprendeu neste projeto
 ```
 
-**Projeto que já tem `aprendizado.md`.** Era o nome do arquivo até a 1.4.0, e o conteúdo vale como está. No fechamento da primeira tarefa feita com a 1.4.1 ou mais nova, o orquestrador renomeia `aprendizado.md` para `julianossr.md` e põe a linha de cima no lugar da 1ª, se ela for um título (`# ...`), ou acima dela, se não for: nenhuma versão anterior fixou a 1ª linha, e ela pode ser a linha de uma tarefa. Depois anota a linha da tarefa no arquivo novo e diz na entrega que renomeou. Se a pasta de trabalho é versionada, o nome antigo e o novo entram no bloco de commit da entrega. Até a troca, quem lê o aprendizado procura pelos dois nomes. Se os dois arquivos existem, o orquestrador não junta sozinho: mostra os dois ao usuário e pergunta.
+**Projeto que já tem `aprendizado.md`.** Era o nome do arquivo até a 1.4.0, e o conteúdo vale como está. No fechamento da primeira tarefa feita com a 1.4.1 ou mais nova, o orquestrador renomeia `aprendizado.md` para `julianossr.md` e põe a linha de cima no lugar da 1ª, se ela for um título (`# ...`), ou acima dela, se não for: nenhuma versão anterior fixou a 1ª linha, e ela pode ser a linha de uma tarefa. Depois anota a linha da tarefa no arquivo novo e diz na entrega que renomeou. Se a pasta antiga era versionada, combine a migração para estado privado antes de mover; não publique conteúdo local novo. Até a troca, quem lê o aprendizado procura pelos dois nomes. Se os dois arquivos existem, o orquestrador não junta sozinho: mostra os dois ao usuário e pergunta.
 
 ## Linha por tarefa
 
@@ -19,7 +19,7 @@ No fechamento de toda tarefa N1 ou acima, uma linha:
 ```
 
 - `r p f d` são as categorias `rapido`, `padrao`, `forte` e `profundo`; entre parênteses, quantos agentes a triagem orçou. É o custo real contra o orçamento.
-- `tokens subagentes` e `orquestrador` saem da 2ª linha do `medir.sh --fechar` (tokens ponderados, com as corridas que caíram no limite). Orquestrador marcado `estimado` leva o `~` na frente. Sem o `medir.sh` (outro harness), escreva `—`, e os agentes e as rodadas servem de medida de custo. Quando a 2ª linha diz "janela vazia em K de N sessão(ões)", o orquestrador dessas K sessões não foi contado. Se a sessão vazia serviu só a esta tarefa, meça de novo com `--sessao <id>` e use esse número. Se não, com K < N grave o número com `≥` na frente e cite a sessão vazia, e com K = N escreva `—`.
+- `tokens subagentes` e `orquestrador` saem da 2ª linha do `medir.sh --fechar` (tokens ponderados, com as corridas que caíram no limite). Orquestrador marcado `estimado` leva o `~` na frente. Sem o `medir.sh` (outro harness), escreva `—`, e os agentes e as rodadas servem de medida de custo. Quando a 2ª linha diz "janela vazia em K de N sessão(ões)", o orquestrador dessas K sessões não foi contado. Intervalo de tarefa não é sessão inteira. Somente se a sessão vazia serviu exclusivamente a esta tarefa, meça de novo com `--sessao <id>` e use esse número. Se não, com K < N grave o número com `≥` na frente e cite a sessão vazia, e com K = N escreva `—`.
 - `correções` são as `C-n` do registro (abaixo).
 - Cada lente aparece com o sinal que a acionou e `confirmados/falsos`. É isso que permite dizer, depois, que um sinal nunca rende achado.
 
@@ -76,3 +76,7 @@ Ferramentas que capturam correções por hook a cada mensagem e injetam regra em
 - **Do projeto** (vale só aqui): vai para o perfil ou para os documentos do projeto, pelo protocolo de evolução que o próprio projeto tiver.
 - **Da seiva** (vale em qualquer projeto): vira proposta no repositório da skill, com o caso que a motivou e um caso de teste novo em `testes/casos.md`.
 - Nenhuma proposta se aplica sozinha. Quem desenvolve aprova, e a aprovação fica com data no registro do escape.
+
+## Ficha local com consentimento
+
+O registro privado acima preserva a história; ele não é payload de contribuição. O [aprendizado](aprendizado.md) usa eventos existentes e só exporta ficha do catálogo sem dados do projeto, após revisão e autorização específica. Intervenção isolada não comprova defeito. Nenhuma proposta altera regras automaticamente; o cliente não implementa correção da Seiva.

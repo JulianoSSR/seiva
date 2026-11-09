@@ -2,7 +2,7 @@
 
 Gerado pela seiva em <AAAA-MM-DD>, a partir das fontes listadas no fim. Cita, não interpreta. Seções L, P, V e E confirmadas pelo usuário em <AAAA-MM-DD>.
 
-Repositório vivo: `<caminho absoluto>` · pasta de trabalho da seiva: `<.claude/seiva ou .seiva>`
+Repositório vivo: `<caminho absoluto>` · pasta privada ignorada de execução da seiva: `<.claude/seiva ou .seiva>`
 
 Varredura do Resina: nunca <ou `AAAA-MM-DD · <caminho do relatório>`, `recusada em AAAA-MM-DD`, `adiada em AAAA-MM-DD (orçamento)`; ver terreno, seção 5>
 
@@ -37,8 +37,8 @@ Varredura do Resina: nunca <ou `AAAA-MM-DD · <caminho do relatório>`, `recusad
 - I1 <regra> — `<arquivo:linha>`
 
 ## M · Modelos
-<Só se diferente do padrão da seiva. Categoria → modelo, ou papel por nível (ex.: N2: adversário forte).>
-<Indisponíveis na conta: profundo → forte, desde AAAA-MM-DD>
+<Mapa detectado nesta sessão: categoria → modelo, fonte e data. Capacidade de escolher modelo e contexto limpo, limites e ferramentas.>
+<Indisponíveis observados em AAAA-MM-DD; alternativa equivalente ou parada. Sem rebaixamento automático sensível.>
 
 ## Ambíguos (perguntar ao usuário)
 - <trecho e por que é ambíguo>

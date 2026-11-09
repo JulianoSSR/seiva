@@ -1,185 +1,97 @@
-# Harness: como disparar subagentes em cada ferramenta
+# Integrações sob demanda
 
-O núcleo da seiva não depende de harness. Este arquivo diz como cada ferramenta faz as três coisas de que ela precisa: disparar um subagente com modelo escolhido, rodar vários em paralelo e manter o revisor sem ferramenta de edição.
+O núcleo é o protocolo: ler regras, classificar risco, dividir arquivos, revisar e verificar. Ele não depende de Claude Code, Codex, Gemini CLI, Cursor ou OpenCode.
 
-Regras para todos:
+Cada integração informa **o que foi detectado**, fonte, data e limitações. Ter um aplicativo instalado não prova que a sessão permite escolher modelo, abrir agente, usar contexto limpo, executar comandos ou medir custo.
 
-- **Só o orquestrador dispara subagentes.** Subagente não chama subagente. É assim que funciona em todos os harnesses (o Gemini CLI nem permite o contrário), e o custo fica previsível.
-- **Nada é instalado no repositório do projeto.** Quando o harness exige arquivo de agente para escolher o modelo (Codex, Gemini, Cursor, OpenCode), a seiva cria quatro agentes genéricos, um por categoria, **no diretório do usuário**, e pergunta antes de criar. Eles não carregam regra nenhuma: o papel vai no pacote.
+## Antes de usar uma integração
 
-## Claude Code
+Confirme no ambiente atual:
 
-- **Disparo:** ferramenta de subagente (`Agent`) com `model` = `haiku`, `sonnet`, `opus` ou `fable`. O parâmetro da chamada vale mais que o frontmatter do agente. Nenhum arquivo precisa ser criado.
-- **Paralelo:** várias chamadas na mesma mensagem. Para não travar a conversa, use `run_in_background`; o resultado chega por notificação, então não fique consultando.
-- **Sem ferramenta de edição:**
-  - batedor: `subagent_type: "Explore"`;
-  - adversário, lentes e verificador: `subagent_type: "Plan"`. Esse tipo não tem as ferramentas de edição, mas tem shell, que o verificador precisa para rodar comandos.
-  - Se um desses tipos devolver fora do formato do contrato, use `general-purpose`, com a proibição no pacote, e anote no registro.
-  - O tipo tira a ferramenta de edição, não o shell. O PROIBIDO do pacote continua valendo.
-- **Agentes do projeto:** um agente em `.claude/agents/` que cubra uma superfície S do perfil é chamado pelo nome no `subagent_type`, com o pacote da seiva no prompt. Confira antes se o arquivo ainda existe: pasta ignorada pelo git não chega a um clone novo.
-- **Worktree:** `isolation: "worktree"` cria a cópia a partir do repositório **em que a sessão abriu**. Se a sessão abriu num clone que não é o vivo, a cópia sai velha. Só use depois de confirmar o repositório na etapa 0. Com outra sessão editando o mesmo repositório em N2 ou N3, sugira a worktree ao usuário.
-- **O que o subagente não tem:** a conversa, a memória da sessão, o `CLAUDE.md` de outro repositório. Tudo vai no pacote.
-- **Tokens:** a notificação de fim de cada subagente traz os tokens usados. Anote no registro, na tabela de agentes; a soma vai para o total da tarefa, junto com o gasto da sessão do orquestrador que o `orcamento-local.sh` mostra (`sessão ≈`).
+| Capacidade | Evidência necessária |
+|---|---|
+| Subagentes | ferramenta ou comando realmente disponível e autorizado |
+| Modelo por agente | parâmetro suportado e modelos acessíveis nesta conta |
+| Contexto limpo | sem herdar conversa; instruções fixas ainda são declaradas |
+| Paralelismo | limite de agentes e exclusividade dos arquivos |
+| Somente leitura | restrição técnica real; se for só instrução, diga isso |
+| Isolamento | diretório, credenciais, rede e efeitos que estão isolados |
+| Contabilidade | fonte, campos, atribuição, intervalo e cobertura |
+| Limite de uso | dado oficial ou estimativa rotulada, com validade |
 
-## Orçamento vivo
+Documentação oficial orienta a integração; a evidência local confirma se ela pode operar nesta sessão. Sem detecção, o estado é `desconhecido` ou `indisponivel`, nunca “suportado” por suposição.
 
-O `scripts/orcamento-local.sh` lê os transcripts que o Claude Code grava em `~/.claude/projects/`, e o terminal e o app desktop gravam do mesmo jeito. Antes de cada leva ele diz se a seiva pode abrir outra. Não precisa de statusline, de hook nem de terminal, e nada é instalado. A decisão continua com o `scripts/orcamento.sh`, que o próprio `orcamento-local.sh` chama: os limiares são os mesmos de antes.
+## Configuração e modo sequencial
 
-- **Como se usa:** antes de cada leva, `bash <skill>/scripts/orcamento-local.sh --tarefa <pasta-da-tarefa> --leva "<papel>:<modelo> ..."`, e leia a palavra depois de `ORCAMENTO`. A linha termina com a fonte (`estimado pelos transcripts`, ou `fonte statusline`), o contexto da sessão contra a janela do modelo, o gasto da sessão com subagentes (`sessão ≈`) e, com `--leva`, a previsão da leva contra o que resta da janela ([medição da tarefa](#medição-da-tarefa)). O `--tarefa` também marca a sessão em `<pasta>/sessoes`, para a medição. A 1ª vez varre os transcripts dos últimos 30 dias (cerca de 5 segundos em 620 transcripts); depois, só o que mudou.
-- **O que mede:**
-  - cada resposta pesa entrada + saída + escrita de cache + `PESO_CACHE_LEITURA` × leitura de cache, contada uma vez: o transcript repete a mesma resposta numa linha por bloco de conteúdo. O peso padrão é 0,01. Em 53 vezes que a conta do autor bateu no limite, ele deixou o total de cada janela com dispersão de 28%; com 0,1 a dispersão foi de 42%, e sem leitura nenhuma, de 31% (medido em 2026-10-13, uma conta, quase toda em Opus);
-  - a janela de 5 horas começa na 1ª resposta depois do fim da anterior, arredondada para baixo em 10 minutos. Assim bateram 53 das 56 janelas com aviso de limite nos transcripts do autor; as outras 3 foram abertas por uso que não aparece neles. Quando a conta bate no limite, o transcript guarda "You've hit your session limit · resets <hora> (<fuso>)", e essa janela passa a ser a exata;
-  - o percentual é o total da janela dividido pelo limite calibrado. O aviso de limite com hora de reinício no futuro vale 100% e `parar`;
-  - o contexto é o tamanho da última resposta da sessão (entrada + leitura e escrita de cache) sobre a janela do modelo: o valor de `SEIVA_JANELA_CONTEXTO`; 1 milhão quando a própria sessão já passou de 200 mil; 1 milhão, marcado `janela deduzida`, quando o modelo passou de 200 mil em algum transcript dos últimos 30 dias; 200 mil nos outros casos. O transcript grava o mesmo nome de modelo nas duas janelas (medido em 2026-10-14: `claude-opus-5` aparece com 686 mil de contexto), por isso a dedução pode errar para quem alterna entre elas; a variável resolve. A sessão é a de `CLAUDE_CODE_SESSION_ID`; sem ela, o transcript mais recente da pasta do projeto, com o aviso `sessão deduzida`.
-- **Calibração:** por pontos. Cada vez que a conta bateu no limite, o total daquela janela até o aviso vale 100% (só entra a janela que os transcripts viram abrir: a aberta pelo claude.ai ou por outra máquina sairia baixa demais). Cada leitura do `/usage` vale o percentual lido, e só conta o que a janela tinha gastado até aquela hora. Desde a 1.4.0, o `/usage` rodado no terminal ou na aba Code fica no transcript (registro `local_command` com `usageReport`, desde o Claude Code 2.1.299, ou o texto `Current session: <n>% used`), e o script o lê sozinho, com a hora exata e, pelo `usageReport`, o fim da janela; leitura colada com o mesmo percentual até 15 minutos antes ou depois é a mesma, e fica a do transcript. A tela de uso do app colada como mensagem não deixa registro: aí o orquestrador roda `orcamento-local.sh --calibrar <percentual> --em <hora do relatório>`. Leitura abaixo de 10% só ancora a execução em que aparece, porque o percentual inteiro dá erro grande nela. Com leitura de 10% ou mais na janela aberta, o limite é a **mediana** dos limites que essas leituras dão (`leitura da janela`): em 2026-10-26 as leituras davam ≈ 3,5 mi, os limites batidos de 16 a 20/10 davam de 1,6 a 2,3 mi, e às 21:57 o menor dos pontos estimava 109% com o `/usage` em 82%. Sem leitura na janela, o limite é o **menor** dos 5 pontos mais recentes, e a linha diz quantos pontos de cada tipo entraram e a dispersão deles. Leitura feita dentro da janela aberta é **âncora**: o percentual parte do valor lido, e só o gasto depois dela é estimado, sobre esse limite. Sem ponto nenhum, o estado é `desligado`, com o motivo e o comando na linha. O `--em` aceita epoch, ISO com `Z` ou com deslocamento (`-03:00`) e a hora local do sistema (`20:26`, `20:26:15`, `8:21am`), lida como a ocorrência mais recente que não está no futuro; ISO sem fuso é recusado. Na hora repetida da volta do horário de verão a leitura pode errar em até 1 hora, sem teste.
-- **Leitura errada tem volta:** a linha de cada leitura nova diz a hora gravada e o comando para desfazer, e avisa quando o limite que ela dá passa do dobro ou fica abaixo da metade dos outros pontos (número digitado errado, em geral). `orcamento-local.sh --leituras` lista as leituras com a hora em UTC e a fonte (`transcript` ou `manual`), e `--descartar <hora|ultima>` apaga uma manual; a do transcript ele recusa, porque ela voltaria na varredura seguinte. O `--calibrar auto` não apaga leitura manual, salvo a que um `/usage` do transcript já trazia (mesmo percentual, até 15 minutos), que passa a ser a do transcript. Nunca se edita o `calibracao.json` à mão: forma que o script não conhece é guardada como `calibracao.json.invalido-<epoch>` e refeita, com aviso. A confirmação mostra a hora lida, o fuso e o equivalente em UTC; o `--leituras` traz a hora local no fim de cada linha, e o `--descartar` aceita a hora da leitura até o minuto (com duas leituras no mesmo minuto, recusa sem apagar nada).
-- **Duas sessões ao mesmo tempo** esperam uma pela outra (`flock`, até 60 segundos); sem `flock` na máquina, a linha avisa que uma leitura pode se perder.
-- **Formato do transcript mudou:** se o transcript desta sessão foi mexido nos últimos 10 minutos, tem resposta do modelo e nenhum registro de uso que o script reconheça, o estado é `desligado` com esse motivo, em vez de 0%.
-- **A 1ª conferência com o número oficial** (2026-10-13, uma conta) mostrou o tamanho do erro. A hora do reinício bateu (14:19:59 no `/usage`, 14:20 na estimativa). O percentual não: a mediana dos 20 limites anteriores dava cerca de 40% quando o `/usage` marcava 73%. Nenhum peso testado (leitura de cache a 0,01 ou 0,1, prêmio acima de 200 mil de contexto) explicou a diferença, e por isso a regra passou da mediana para o menor dos pontos recentes. Na mesma sessão, com essa leitura como base, uma única resposta que reescreveu 373 mil tokens de cache levou a estimativa de 73% para mais de 100% sem a conta bater no limite: a escrita de cache pesa menos na conta oficial do que o peso 1 do script. A 2ª leitura, 17 minutos depois (90%), não fechou com a 1ª em peso nenhum: a janela tinha gasto que os transcripts não veem. Daí a âncora, que deixa a estimativa só para o gasto depois da última leitura.
-- **Conferência de 2026-10-15** (mesma conta): entre duas leituras do `/usage` (01:55 e 02:08 UTC), os contadores de "Session" do relatório e o transcript da sessão bateram exatamente na entrada (72), na escrita de cache (250.110) e na leitura de cache (8,41 mi). Nesse intervalo, o transcript viu o que a conta viu. A saída não bateu: 317 no relatório, 56.910 no transcript. A leitura de 27% deu um limite de 1,6 mi, quando as anteriores davam de 1,2 a 1,5 mi. A variação veio do peso que a conta dá a cada tipo de token e modelo, não de gasto escondido. A janela abriu na 1ª mensagem depois das 01:55 (o `/usage` das 01:55 dava 0%, sem hora de reinício), e o reinício saiu às 06:49:59: o início foi arredondado para baixo em 10 minutos, como o script supõe.
-- **Estados:**
-  - `ok`: segue.
-  - `restrito` (70% ou mais, código 10): N2 e N3 não começam nem abrem leva nova. O usuário pode mandar seguir, e isso vira `D-n` no registro, com o custo se errado. N0 e N1 seguem, com a Próxima ação gravada antes de cada leva. O nível não desce por causa do orçamento: uma tarefa N3 continua N3 e espera o reinício ou a decisão do usuário.
-  - `parar` (código 20): 85% ou mais, limite batido, ou contexto desta sessão em 70% ou mais. Parada limpa em qualquer nível, só na fronteira entre levas ([retomada](retomada.md)). A linha diz se o motivo é o contexto (a sessão nova pode começar já) ou a janela (a sessão nova espera a hora do reinício).
-  - `sem-dado`: a janela reiniciou depois da última gravação; só acontece com o arquivo da statusline. Trate como `desligado`.
-  - `desligado`: sem `jq`, sem transcripts ou sem calibração. Diga uma vez por tarefa o motivo que a linha traz e siga. Em N2 e N3, grave a Próxima ação antes de cada leva: sem o dado, nada avisa que a janela está acabando.
-- **Estouro no meio da leva:** a janela pode acabar com um agente rodando. O que salva o trabalho é a Próxima ação gravada antes da leva, com os relatórios esperados, e o pacote de cada agente em arquivo ([retomada](retomada.md)).
-- **Limites:**
-  - o percentual é estimado. A contabilidade da assinatura não é pública, e o número é freio, não medidor oficial. Os pontos de uma mesma conta variam de 25 a 33% entre si, e a conferência acima errou para os dois lados conforme o tipo de gasto: leia o número como faixa, e cole o `/usage` quando ele importar;
-  - uso fora do Claude Code desta máquina (o chat do claude.ai, outra máquina) não aparece nos transcripts, mas gasta a mesma janela. A calibração automática absorve parte disso; o resto é erro para baixo;
-  - a mistura de modelos não tem peso: uma janela gasta em Haiku pesa como se fosse em Opus. A calibração foi medida numa conta quase só de Opus;
-  - a calibração automática depende do texto em inglês do aviso de limite ("You've hit your session limit · resets ..."). Se o Claude Code mudar esse texto, ela deixa de achar pontos novos e segue com os que já guardou;
-  - a leitura automática só existe quando o usuário roda `/usage`: o agente não o aciona (`claude -p "/usage"` devolve só o custo daquela chamada, medido na 2.1.282). Registro do `/usage` com `usageReport` que não serve, ou com `%` num texto que não casa, gera aviso na linha (`formato que não reconheço`); registro sem número nenhum não é leitura e passa calado;
-  - `CLAUDE_CODE_SESSION_ID` não é documentada (medida no app desktop em 2026-10-13). Sem ela, a sessão é deduzida, e com duas sessões abertas no mesmo projeto o contexto medido pode ser o da outra;
-  - a janela de contexto vem do histórico do modelo; modelo novo começa em 200 mil até aparecer acima disso, o que só adianta a parada;
-  - o Claude Code apaga transcripts com mais de 30 dias (padrão do `cleanupPeriodDays`). Os pontos de calibração já guardados ficam em `calibracao.json`;
-  - a janela de 7 dias não é estimada. Sem statusline, a linha mostra o 7d da última leitura do `/usage` feita dentro da janela de 5 horas aberta (até 5 horas de idade, sem dizer a hora), e `--` fora disso; ele só aparece, não muda o estado. Perto do teto semanal quem decide é o usuário (`/usage`);
-  - em outro harness não há esses transcripts: o estado é `desligado`.
-- **O que é gravado, e onde:** em `${XDG_CACHE_HOME:-$HOME/.cache}/seiva/`, sempre em modo 600: `orcamento-local.json` (o estado, no formato do `orcamento.json` com `fonte`, `cinco_horas.motivo`, `contexto.desta_sessao` e `estimativa`) e `calibracao.json` (os pontos, a calibração manual e o maior contexto visto por modelo). Do transcript só saem números, horários, nomes de modelo, o texto do aviso de limite e os percentuais e horas do `/usage`: nenhum texto de conversa. Na pasta da tarefa, o `--tarefa` acrescenta uma linha `<epoch> <sessão>` em `sessoes`; com a pasta de trabalho ou a `tarefas/` no lugar da tarefa, sai com código 2 sem gravar.
+Adaptador carrega só quando a tarefa precisa. Não criar agentes no diretório global do usuário, não alterar configurações persistentes e não instalar hooks ou regras para toda sessão. Use ferramentas já disponíveis ou configuração temporária limitada à tarefa, quando autorizada. Referências e exemplos de adaptadores não são executados pelo simples carregamento da skill.
 
-### Medição da tarefa
+Sem subagentes, o orquestrador pode executar a parte mecânica e preparar um pacote para outra sessão ou revisor. Uma releitura no mesmo contexto é autoconferência. Se a tarefa exige revisão independente e ela não existe, o portão fica pendente até receber essa revisão; o modo sequencial não dispensa qualidade nem rebaixa N3.
 
-O `scripts/medir.sh` mede quanto uma tarefa gastou, com a mesma régua do orçamento, e guarda o custo de cada agente num histórico que melhora a previsão a cada tarefa medida.
+## Uso por ferramenta
 
-- **Como se usa:** `bash <skill>/scripts/medir.sh --tarefa <pasta-da-tarefa>`, no meio da tarefa quando quiser, e com `--fechar` no fechamento, na sessão do orquestrador. Tarefa de antes da 1.3.0 não tem marca de sessão: o script diz isso, lista as sessões do projeto que citam a pasta, e a sessão do orquestrador entra com `--sessao <id>` (conta inteira). Desde a 1.3.1 conta inteira mesmo quando a sessão tem marca, e a saída diz que a marca foi ignorada. Desde a 1.4.0, a pasta de trabalho ou a `tarefas/` no lugar da tarefa sai com código 2 sem gravar nada, como nos outros scripts que recebem pasta.
-- **O que mede:**
-  - subagentes: os das sessões da tarefa cujo pacote (a 1ª mensagem do agente) cita o nome da pasta. O nome conta só inteiro, com caractere fora de `[A-Za-z0-9_-]` (ou o começo e o fim do texto) dos dois lados: desde a 1.4.0, a tarefa `x-tarefa` não leva os agentes da `x-tarefa-2`, e um nome colado em `_`, letra ou dígito (`x-tarefa_v2`) não conta. Os outros saem contados como "de outra tarefa", fora da soma. Em 2026-10-14, os 37 pacotes de duas tarefas reais do ciclo-arboris citavam a pasta;
-  - corridas e quedas: corrida é cada mensagem que o agente recebeu do orquestrador (o pacote e as retomadas); queda é cada resposta de erro da API no transcript dele;
-  - orquestrador: as respostas de cada sessão entre a 1ª e a última marca desta tarefa em `<pasta>/sessoes`. Marcam o `nova-tarefa.sh`, o `orcamento-local.sh --tarefa` e o `medir.sh --fechar`. Sessão que serviu a outra tarefa no mesmo intervalo (outra pasta marcou a sessão, ou há subagente que não é desta tarefa) tem a parte do orquestrador dividida pela proporção do gasto dos subagentes, ou em partes iguais quando só esta tarefa teve subagente, e sai `estimado`; Sessão com uma marca só, ou com todas as marcas no mesmo segundo, tem janela vazia: não conta nada, e a saída diz "janela vazia", com os dois caminhos (`--sessao <id>`, ou `--fechar` depois da marca de abertura).
-  - papel: a 1ª palavra conhecida da descrição que o orquestrador deu ao agente (batedor, construtor, adversário, lente, implementador, verificador, invasor, revisor). Descrição que não começa pelo papel vira `outro`.
-- **O que grava:** `<pasta>/medicao.md` (uma linha por agente, com a descrição, e o orquestrador por sessão) e `${XDG_CACHE_HOME:-$HOME/.cache}/seiva/custos.jsonl`, em modo 600, uma linha por agente encerrado: papel, família do modelo, nível da tarefa, ponderado, entrada e leitura de cache, quedas e corridas. O histórico não leva texto: nem descrição, nem nome de tarefa, nem caminho. A linha do orquestrador tem a chave `orq-<sessão>:<12 caracteres do sha256 do nome da tarefa>` desde a 1.4.0, para duas tarefas da mesma sessão não se apagarem; a linha antiga `orq-<sessão>` não é migrada. Medir de novo substitui as linhas dos mesmos agentes. Agente com transcript mexido há menos de 2 minutos está rodando e fica fora do histórico, a não ser que o transcript principal já tenha o aviso de fim dele (`<task-notification>`, como mensagem, `attachment` ou `queue-operation`); agente retomado depois do aviso conta como encerrado até a medição seguinte. Linha ilegível não some: o arquivo inteiro é guardado como `custos.jsonl.invalido-<epoch>-<pid>` antes de ser refeito.
-- **Previsão da leva:** o `orcamento-local.sh --leva "construtor:opus adversario:opus"` soma, para cada item, a mediana das corridas limpas (sem queda e sem retomada) daquele papel e modelo no histórico, e compara com o que resta da janela de 5 horas. Item com menos de 3 corridas limpas fica fora da soma, e a linha diz qual. A decisão continua com o `orcamento.sh`: o `NÃO CABE` é aviso para o orquestrador dividir a leva, não muda o código de saída.
-- **Por que medir, e não copiar a notificação:** o número que o Claude Code informa no fim de cada subagente é a entrada, a saída e a escrita de cache da última corrida. Ficam de fora a leitura de cache e as corridas que caíram no limite. Na tarefa de logs do ciclo-arboris (2026-10-05), um construtor informou 269 mil e gastou 1,10 mi; na do ponto eletrônico, os agentes que caíram no limite levaram 2,74 mi, 21% da sessão, sem aparecer em número nenhum do registro.
-- **Limites:**
-  - cada instalação aprende só com o próprio uso. Não há troca de histórico entre usuários: isso exigiria mandar dado para fora da máquina;
-  - a previsão é a mediana do papel, não da tarefa: um construtor de tarefa grande gasta mais que a mediana. É freio para não abrir leva que não cabe, não orçamento exato;
-  - a régua é a do orçamento: leitura de cache a 1% e todos os modelos com o mesmo peso. Se o limite da conta pesar Sonnet e Haiku diferente de Opus, a soma em tokens ponderados erra; o histórico guarda entrada e leitura de cache separadas para que esse peso possa ser medido depois;
-  - o orquestrador entre as marcas inclui tudo o que a sessão fez nesse intervalo, mesmo uma pergunta do usuário fora da tarefa. Depois da última marca, nada conta: no fechamento, o `--fechar` cobre a etapa 9; A janela vazia é o caso extremo disso, e sai dita.
-  - a atribuição do subagente depende de o pacote citar a pasta e de o Claude Code gravar o subagente em `<sessão>/subagents/agent-<id>.jsonl` (formato medido em 2026-10-14). Resposta de subagente no transcript principal (formato antigo) fica fora da conta, com aviso;
-  - a retomada é reconhecida porque a mensagem do orquestrador a um agente rodando não começa por tag, e o lembrete do harness começa (`<system-reminder>`). Se o Claude Code mudar isso, a contagem de corridas erra, e com ela o filtro de corrida limpa;
-  - transcript apagado (o Claude Code apaga depois de 30 dias) não se mede mais: rode o `medir.sh` no fechamento.
+- **Claude Code:** conferir a ferramenta de agentes e seus parâmetros atuais. Não presumir aliases de modelo, tipos Explore/Plan ou isolamento. Os scripts `orcamento-local.sh` e `medir.sh` são específicos de transcripts compatíveis do Claude Code; não medem Codex, Gemini, Cursor ou OpenCode.
+- **Codex:** conferir ferramentas de colaboração, herança de contexto, modelos e restrições expostas na sessão. Um ambiente com perfis predefinidos pode não permitir modelo arbitrário por agente.
+- **Gemini CLI, Cursor e OpenCode:** conferir comandos e formato de agentes na documentação oficial atual e no ambiente. Sem suporte temporário já disponível, usar o modo sequencial; não instalar agentes globais para contornar a falta.
+- **Outros:** aplicar o mesmo contrato de capacidades e declarar os campos sem fonte. Não copiar o formato de transcript de uma ferramenta para outra.
 
-### Statusline (opcional, só no terminal)
+## Tokens, custo e intervalo
 
-No `claude` de terminal, a statusline recebe a cada mensagem o percentual oficial das janelas de 5 horas e de 7 dias. Com ela instalada e gravando há menos de 10 minutos, o `orcamento-local.sh` usa o número oficial no lugar da estimativa (`fonte statusline`); o contexto continua vindo do transcript da sessão. No app desktop ela não roda: a aba Code não chama a statusline (confirmado em 2026-10-01), e o `orcamento-local.sh` a ignora quando `CLAUDE_CODE_ENTRYPOINT=claude-desktop`. Sem ela, nada muda nos freios.
+Uma medição registra origem, instante, identificadores pseudônimos de tarefa e tentativa, intervalo e unidade. Entrada, saída, leitura e escrita de cache permanecem separadas. Valor bruto, ponderação local e dinheiro não são somados como se fossem a mesma unidade.
 
-- **O que é gravado:** `orcamento.json` (`versao`, `harness`, `script`, `gravado_em`, `sessao`, `cinco_horas` e `sete_dias` com `usado`, `reinicia` e `visto_em`, e `contexto`) e `retomar`, o caminho do `registro.md` da tarefa em curso, que o `--tarefa` grava e a barra usa para dizer qual tarefa retomar. A partir de 70%, a barra termina com `estourou? sessão nova + retome <tarefa>`.
-- **Instalação:** só com o usuário. O orquestrador pergunta antes, preenche `SKILL` com o caminho absoluto da skill que está carregada (o harness mostra a pasta base dela; nunca suponha `~/.claude/skills/seiva`, porque a skill pode vir de um clone ou de um plugin) e entrega o bloco abaixo. A instalação é por cópia: atualizar a skill não muda o script que roda a cada mensagem. O bloco para sem mudar nada se o `settings.json` já tem uma `statusLine`. Depois de rodar, o usuário abre uma sessão nova do `claude` no terminal e manda uma mensagem.
+Notificação de fim serve para acompanhamento; não é a fonte canônica do custo total. Relatórios de uso podem omitir cache, corridas interrompidas ou partes do orquestrador.
+
+O intervalo da tarefa não é a sessão inteira: uma tarefa atravessa sessões; uma sessão alterna tarefas. Só atribua consumo por identificação ou intervalo demonstrável. Com uma marca só, sobreposição ou fonte incompleta, marque atribuição parcial/estimada. Medir a sessão inteira exige confirmar que ela foi exclusiva da tarefa. Não apresente dado ausente como zero.
+
+## Integração legada de orçamento do Claude Code
 
 ```bash
-(
-  umask 077 &&
-  SKILL='<caminho absoluto da skill carregada, preenchido pelo orquestrador>' &&
-  CFG="$HOME/.claude/settings.json" &&
-  test -f "$SKILL/scripts/statusline-orcamento.sh" &&
-  { test -f "$CFG" || printf '{}\n' > "$CFG"; } &&
-  jq -e 'type == "object" and (has("statusLine") | not)' "$CFG" >/dev/null &&
-  cp -p "$CFG" "$CFG.bak-$(date +%Y%m%d-%H%M%S)" &&
-  install -m 0755 "$SKILL/scripts/statusline-orcamento.sh" "$HOME/.claude/statusline-seiva.sh" &&
-  jq '.statusLine = {"type": "command", "command": "bash ~/.claude/statusline-seiva.sh", "padding": 0}' "$CFG" > "$CFG.novo" &&
-  jq -e '.statusLine.command == "bash ~/.claude/statusline-seiva.sh"' "$CFG.novo" >/dev/null &&
-  mv "$CFG.novo" "$CFG" &&
-  echo "OK às $(date +%s): abra uma sessão nova, mande uma mensagem e rode: bash $SKILL/scripts/orcamento.sh"
-) || echo "PAROU AQUI: o settings.json só muda na linha do mv. Se já existe statusLine, o bloco para de propósito."
+bash <skill>/scripts/orcamento-local.sh --tarefa <pasta> --leva "<papel>:<modelo> ..."
+bash <skill>/scripts/medir.sh --tarefa <pasta> --fechar
 ```
 
-- **Atualização:** depois de atualizar a skill, ou quando a linha avisar `statusline desatualizada`, o usuário copia o script de novo:
+Os comandos só valem após confirmar dependências e formato suportado. A leitura de transcripts é local, sem publicar prompts ou conversas. Sem fonte reconhecida, informe a lacuna uma vez e mantenha checkpoint antes da leva.
+
+`restrito` e `NÃO CABE` interrompem a abertura de trabalho que não cabe. `parar` pede parada limpa na fronteira da leva. Limite de custo não aprova achado, não reduz nível nem dispensa revisão. A retomada segue [retomada](retomada.md).
+
+A estimativa por transcripts e a janela de uso são heurísticas da integração, não tokens oficiais nem saldo financeiro. Statusline e comandos de uso são opcionais; não instalar configuração global como parte desta skill.
+
+## Monitor local e seleção de levas
+
+O monitor é acionado só para a tarefa. Não roda como daemon, não instala hook e não altera configuração global. Confira as opções disponíveis com `--help`.
 
 ```bash
-install -m 0755 '<caminho absoluto da skill carregada>/scripts/statusline-orcamento.sh' ~/.claude/statusline-seiva.sh
+python3 scripts/monitor.py capacidades --app codex --saida <capacidades.json>
+python3 scripts/monitor.py coletar --app codex --tarefa <tarefa> --fonte <uso.jsonl> --inicio <ISO-com-fuso> --fim <ISO-com-fuso>
+python3 scripts/monitor.py vigiar --app codex --tarefa <tarefa> --fonte <uso.jsonl> --intervalo 15 --duracao 300
+python3 scripts/monitor.py selecionar --tarefa <tarefa> --capacidades <capacidades.json> --tarefas <tarefas.json> --reserva <id>
+python3 scripts/monitor.py liberar --tarefa <tarefa> --reserva <id>
 ```
 
-- **Volta:** o bloco abaixo tira a `statusLine` do `settings.json`, e só depois apaga a cópia e os arquivos dela no cache (o `orcamento-local.json` e a `calibracao.json` ficam). Se a `statusLine` não for a da seiva, ele para. O `.bak-<data>` que a instalação deixou é o último recurso: desfaz também o que mudou no `settings.json` depois dele.
+`--app` aceita `codex`, `claude`, `gemini`, `opencode`, `cursor` e `generic`. Identificar o app não comprova uma capacidade. A detecção consulta o que estiver implementado e acessível; catálogo vivo de modelos do Codex exige seu serviço disponível. `--rpc-bin` permite indicar o executável para essa consulta. Ausência, formato desconhecido ou falha ficam explícitos.
 
-```bash
-(
-  umask 077 &&
-  CFG="$HOME/.claude/settings.json" &&
-  C="${XDG_CACHE_HOME:-$HOME/.cache}/seiva" &&
-  jq -e '.statusLine.command == "bash ~/.claude/statusline-seiva.sh"' "$CFG" >/dev/null &&
-  jq 'del(.statusLine)' "$CFG" > "$CFG.novo" &&
-  jq -e 'has("statusLine") | not' "$CFG.novo" >/dev/null &&
-  mv "$CFG.novo" "$CFG" &&
-  rm -f "$HOME/.claude/statusline-seiva.sh" "$C/orcamento.json" "$C/retomar" &&
-  { rmdir "$C" 2>/dev/null || true; } &&
-  echo "OK: statusline removida do settings e depois do disco; vale na próxima sessão"
-) || echo "PAROU AQUI: se a statusLine não é a da seiva, o bloco para de propósito. O .bak-<data> é o último recurso: ele desfaz também o que mudou no settings depois dele."
-```
+`coletar` aceita várias `--fonte`; `--inicio` e `--fim` delimitam o intervalo da tarefa. `vigiar` repete coleta por duração limitada e precisa ser iniciado: coleta pontual não é acompanhamento ativo. O monitor usa metadados de uso, sem publicar texto de conversa. Dado oficial e dado estimado mantêm origem, instante e unidade distintos.
 
-- **Limites da statusline:** só chega `rate_limits` para assinante Pro ou Max, e só depois da 1ª resposta da sessão (documentação oficial, lida em 2026-09-29); duas sessões gravando ao mesmo tempo podem perder uma atualização; a barra pode estar uma mensagem atrás, então a idade do dado aparece na linha (`dado de <n> min`); rodado à mão, o `orcamento.sh` sobre o arquivo da statusline mantém os avisos de antes (`statusline desatualizada`, `app desktop`).
+A entrada de seleção descreve cada tarefa: `id`, `kind`, `risk` (0–3), `complexity`, `context_tokens`, `required_tools`, `depends_on`, `priority`, `authorized` e candidatos. Cada candidato informa modelo, qualidade avaliada para aquele trabalho, ferramentas, limite de contexto, tokens previstos, custo previsto, tokens de revisão, retrabalho e fechamento (closing_tokens), e esforço. A tarefa independent exige capacidade de contexto limpo; completed libera dependências. Capacidade expirada exige nova detecção. Qualidade é julgamento explícito com evidência; um catálogo de modelos não a prova.
 
-## Codex CLI
+A seleção verifica o maior risco requerido, dependências, autorização, contexto, ferramentas, qualidade e saldo antes do preço. Soma consumo previsto com revisão e retrabalho. Histórico pode entrar por --historico <json>: cada amostra informa modelo, kind, risk, total_tokens e accepted. A previsão divide tokens totais, inclusive falhas, pelo número de sucessos comparáveis. Sem amostra suficiente usa previsão conservadora com margem; não chama essa hipótese de medida.
 
-Confira na documentação do Codex antes do primeiro uso, porque os detalhes mudam rápido.
+A entrada contém tasks (lista), completed (IDs concluídos) e budget. Saldo exige budget {tokens, unit: "tokens", observed_at, source}, com fonte e instante de até 300 segundos. --saldo-tokens substitui somente o valor: não dispensa unidade, fonte e horário válidos. Não converter percentual de janela em tokens nem deduzir saldo de preço. Sem saldo confiável, a seleção declara orçamento desconhecido e não abre a leva.
 
-- **Agentes:** arquivos TOML em `~/.codex/agents/`, com `name`, `description` e `developer_instructions`. O modelo definido no arquivo do agente tem precedência sobre o padrão. Crie `seiva-rapido`, `seiva-padrao`, `seiva-forte` e `seiva-profundo`, com instruções mínimas. Use a pasta do usuário, nunca a `.codex/agents/` do projeto.
-- **Paralelo:** o Codex roda agentes em paralelo e junta os resultados. O limite fica em `[agents]` do `config.toml`.
-- **Skill:** a pasta `seiva/` vai para o diretório de skills do Codex. As regras do projeto estão no `AGENTS.md`, que o Terreno lê.
-- **Uso do plano:** o Codex tem caminho oficial que o agente chama: `codex app-server`, método JSON-RPC `account/rateLimits/read` (pesquisa de 2026-10-26; o esquema muda, gere com `codex app-server generate-json-schema`). O `orcamento-local.sh` ainda não o lê. O Gemini CLI não expõe a cota.
+A reserva usa arquivo privado compartilhado pelo repositório git comum, com trava atômica e prazo de validade: evita que duas sessões prometam o mesmo saldo. Ela não é configuração global nem agente persistente. Libere a reserva ao terminar ou abortar; reserva expirada não é prova de execução concluída.
 
-Esboço de agente (conferir os nomes de campo e de modelo):
+## Cobertura conferida em 2026-11-08
 
-```toml
-name = "seiva-forte"
-description = "Executa um pacote da seiva na categoria forte."
-model = "gpt-6-astra"
-model_reasoning_effort = "medium"
-developer_instructions = "Siga o PAPEL e o pacote recebidos. Não edite fora do ESCOPO. Responda no formato de SAÍDA."
-```
+| Integração | Evidência disponível | Limite |
+|---|---|---|
+| Codex | executável local, consulta real de catálogo e quota, parser com registro local | não é comparação de tarefa completa; registro recente não atribui sessão inteira |
+| Claude Code | scripts legados preservados; parser novo com fixtures | parser novo não validado em tarefa real completa |
+| Gemini CLI | fixtures do formato documentado | simulado, sem execução real da integração |
+| OpenCode | fixtures do formato documentado | simulado, sem execução real da integração |
+| Cursor | formato de saída consultado | tokens indisponíveis no formato público suportado; não inferir zero |
+| Generic | contrato explícito de uso em fixture | fonte precisa trazer campos e semântica reconhecidos |
 
-## Gemini CLI
+As fontes de formato são [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Gemini CLI headless](https://geminicli.com/docs/cli/headless/), [Cursor CLI output format](https://cursor.com/docs/cli/reference/output-format), [mensagens de sessão do OpenCode](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/message.ts) e [streaming da Claude API](https://platform.claude.com/docs/en/build-with-claude/streaming). A API de streaming não documenta por si só todo transcript local do Claude Code: a integração declara o que consegue reconhecer.
 
-- **Agentes:** `~/.gemini/agents/*.md`, um por categoria, com `model` explícito. O `/model` da sessão não muda o modelo dos subagentes.
-- **Subagente não chama subagente** (proibido pela ferramenta).
-- **Paralelo:** não confirmado na documentação. Rode em sequência.
+Quota, créditos e tokens são campos separados. Cota com horário antigo mantém a marca de validade; saldo financeiro não vira tokens por regra implícita. Pesos e heurísticas do orçamento legado do Claude não são aplicados a outros aplicativos. Evidências pessoais de consulta ficam na execução privada, sem publicar quotas.
 
-## Cursor
-
-- **Agentes:** `~/.cursor/agents/`, um por categoria. O Cursor também lê `.claude/agents/` e `.codex/agents/`.
-- **Modelo:** campo `model`, com esforço entre colchetes (`modelo[effort=high]`). Use `readonly` nos revisores.
-- **Skills:** lê `SKILL.md` desde a versão 2.4.
-
-## OpenCode
-
-- **Agentes:** `~/.config/opencode/agents/*.md`, com `mode: subagent` e `model: provedor/modelo` sempre explícito. Sem `model`, o subagente herda o modelo de quem o chamou e a categoria se perde.
-
-## GitHub Copilot, Windsurf e harness sem subagente com modelo próprio
-
-Use o **modo sequencial**:
-
-1. Cada papel roda em sequência, no mesmo contexto.
-2. Antes de trocar de papel, grave o artefato da etapa em arquivo.
-3. Declare a troca ("agora como adversário") e trabalhe só com o papel e o artefato, sem voltar ao raciocínio anterior.
-4. A independência dessas revisões é `mesmo-contexto`. Diga isso na entrega.
-5. Em N3, recomende uma revisão de fora, como na seção seguinte.
-
-## Revisão por outro provedor
-
-É a independência mais forte que existe e funciona em qualquer harness. Em N3, se o usuário tiver uma segunda ferramenta (Codex, Gemini), o orquestrador prepara `revisao-externa.md` com o plano ou o diff, o papel do adversário e o formato de achado.
-
-Antes de gravar o arquivo:
-
-- tire valor de segredo, dado pessoal e dado de cliente. Plano e diff não devem ter nenhum deles; se tiverem, isso já é um achado;
-- diga ao usuário que o conteúdo vai para outro provedor. Quem manda é ele.
-
-O usuário abre a outra ferramenta, cola o arquivo e traz a resposta. O achado que volta é julgado como qualquer outro, com independência `outro-provedor`.
+O monitor Python exige pasta da tarefa ignorada dentro do repositório. O armazenamento externo descrito no núcleo não é aceito por esse monitor nesta versão. Os scripts de estado e monitor usam `fcntl` e exigem Linux/macOS; no Windows, execute pelo WSL. O executável Windows do Codex pode ser consultado por caminho explícito a partir do WSL.

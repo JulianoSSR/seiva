@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Ficha Seiva sem dados do projeto",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "categoria",
+    "causa",
+    "evidencia_sintetica",
+    "melhoria",
+    "schema",
+    "sintoma",
+    "versao_seiva"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "versao_seiva": {
+      "type": "string",
+      "pattern": "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
+    },
+    "categoria": {
+      "enum": [
+        "bloqueio",
+        "falhas",
+        "orcamento",
+        "intervencao",
+        "escape",
+        "repeticao"
+      ]
+    },
+    "sintoma": {
+      "type": "string"
+    },
+    "causa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tipo",
+        "descricao"
+      ],
+      "properties": {
+        "tipo": {
+          "enum": [
+            "hipotese",
+            "comprovada"
+          ]
+        },
+        "descricao": {
+          "type": "string"
+        }
+      }
+    },
+    "melhoria": {
+      "type": "string"
+    },
+    "evidencia_sintetica": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "categoria": {
+          "const": "bloqueio"
+        },
+        "sintoma": {
+          "const": "Etapa bloqueada ou expirou."
+        },
+        "causa": {
+          "const": {
+            "tipo": "hipotese",
+            "descricao": "Pode faltar uma condição de execução."
+          }
+        },
+        "melhoria": {
+          "const": "Conferir premissas antes de repetir."
+        },
+        "evidencia_sintetica": {
+          "enum": [
+            null,
+            "Exemplo sintético: etapa perde uma condição.",
+            "Exemplo sintético: uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; "
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "categoria": {
+          "const": "falhas"
+        },
+        "sintoma": {
+          "const": "Etapa falha repetidamente."
+        },
+        "causa": {
+          "const": {
+            "tipo": "hipotese",
+            "descricao": "Contrato pode estar incompleto."
+          }
+        },
+        "melhoria": {
+          "const": "Conferir contrato antes de repetir."
+        },
+        "evidencia_sintetica": {
+          "enum": [
+            null,
+            "Exemplo sintético: três tentativas falham.",
+            "Exemplo sintético: uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; "
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "categoria": {
+          "const": "orcamento"
+        },
+        "sintoma": {
+          "const": "Consumo excede a previsão."
+        },
+        "causa": {
+          "const": {
+            "tipo": "comprovada",
+            "descricao": "Reserva menor que o consumo."
+          }
+        },
+        "melhoria": {
+          "const": "Rever margem com revisão e retomada."
+        },
+        "evidencia_sintetica": {
+          "enum": [
+            null,
+            "Exemplo sintético: reserva 2, consumo 3.",
+            "Exemplo sintético: uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; "
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "categoria": {
+          "const": "intervencao"
+        },
+        "sintoma": {
+          "const": "Pessoa corrigiu o processo."
+        },
+        "causa": {
+          "const": {
+            "tipo": "hipotese",
+            "descricao": "Pode haver contexto ou regra omitida."
+          }
+        },
+        "melhoria": {
+          "const": "Conferir intenção antes de mudar regras."
+        },
+        "evidencia_sintetica": {
+          "enum": [
+            null,
+            "Exemplo sintético: classificação revista.",
+            "Exemplo sintético: uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; "
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "categoria": {
+          "const": "escape"
+        },
+        "sintoma": {
+          "const": "Defeito surgiu após revisão."
+        },
+        "causa": {
+          "const": {
+            "tipo": "hipotese",
+            "descricao": "Cobertura pode ser insuficiente."
+          }
+        },
+        "melhoria": {
+          "const": "Criar reprodução e teste independente."
+        },
+        "evidencia_sintetica": {
+          "enum": [
+            null,
+            "Exemplo sintético: teste omite um cenário.",
+            "Exemplo sintético: uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; "
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "categoria": {
+          "const": "repeticao"
+        },
+        "sintoma": {
+          "const": "Leitura ou execução repetida."
+        },
+        "causa": {
+          "const": {
+            "tipo": "hipotese",
+            "descricao": "Evidência válida pode não ser reutilizada."
+          }
+        },
+        "melhoria": {
+          "const": "Conferir validade antes de repetir."
+        },
+        "evidencia_sintetica": {
+          "enum": [
+            null,
+            "Exemplo sintético: duas leituras iguais.",
+            "Exemplo sintético: uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; uma etapa repete trabalho sem verificar a validade da prova anterior; "
+          ]
+        }
+      }
+    }
+  ]
+}

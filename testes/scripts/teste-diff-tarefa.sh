@@ -76,11 +76,21 @@ eq "D-a · tarefas/: sem diff.patch" nao "$([ -e "$W/tarefas/diff.patch" ] && ec
 roda "$W/tarefas/" a.sh
 eq "D-a · tarefas/ com barra final: código 2" 2 "$RC"
 
-# --- caso feliz: a pasta da tarefa, arquivo novo entra no diff ---------------------------
-roda "$W/tarefas/2026-01-01-uma" a.sh nao-existe.sh
+# --- contrato novo: base verificável e escopo explícito antes da edição -----------------
+# O arquivo já presente é a base completa, sem presumir que HEAD represente esta tarefa.
+P="$W/tarefas/2026-01-01-uma"
+(cd "$R" && python3 "$RAIZ/scripts/estado_tarefa.py" init "$P") || exit 2
+(cd "$R" && bash "$RAIZ/scripts/base-tarefa.sh" "$P" --exclusive a.sh novo.sh nao-existe.sh) >/dev/null || exit 2
+printf 'echo tarefa\n' >>"$R/a.sh"
+printf 'echo oi\n' >"$R/novo.sh"
+roda "$P" a.sh novo.sh
 eq "feliz: código 0" 0 "$RC"
-tem "feliz: a.sh aparece como novo" "$SAI" "novo       a.sh"
-tem "feliz: o que não existe é dito" "$SAI" "nao-existe nao-existe.sh"
+tem "feliz: a.sh aparece como alterado desde a base" "$SAI" "alterado   a.sh"
+tem "feliz: novo.sh aparece como novo" "$SAI" "novo       novo.sh"
+roda "$P" nao-existe.sh
+eq "caminho solicitado ausente na base e entrega: erro" 2 "$RC"
+tem "ausente: erro explica o arquivo" "$ERR" "arquivo solicitado ausente"
+
 eq "feliz: diff.patch gravado na pasta da tarefa" sim "$([ -f "$W/tarefas/2026-01-01-uma/diff.patch" ] && echo sim)"
 tem "feliz: o diff traz o conteúdo do arquivo novo" "$(cat "$W/tarefas/2026-01-01-uma/diff.patch")" "+echo oi"
 nao_tem "feliz: nada de diff.patch na pasta de trabalho" "$(ls "$W")" "diff.patch"

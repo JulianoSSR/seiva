@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<rect id="fundo" width="1024" height="1024" fill="#081C15"/>
+<path id="gota" d="M512 176.89L310.75 432.89A256 256 0 1 0 713.25 432.89Z" fill="#E3A72F"/>
+<g id="arvore">
+<path id="tronco" d="M472 843.96C478 790 503 760 503 690L521 690C521 760 546 790 552 843.96A256 256 0 0 1 472 843.96Z" fill="#081C15"/>
+<g id="galhos" fill="none" stroke="#081C15" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+<path id="caule" d="M512 700L512 374"/>
+<path id="galho-a-esq" d="M512 482C483.65 453.65 450 449.19 450 418"/>
+<path id="galho-a-dir" d="M512 482C540.35 453.65 574 449.19 574 418"/>
+<path id="galho-b-esq" d="M512 716C464.8 621.6 394 590.82 394 480"/>
+<path id="galho-b-dir" d="M512 716C559.2 621.6 630 590.82 630 480"/>
+<path id="galho-c-esq" d="M419.49 579.54C427.54 556.55 452 542.36 452 518"/>
+<path id="galho-c-dir" d="M604.51 579.54C596.46 556.55 572 542.36 572 518"/>
+<path id="galho-d-esq" d="M435.3 604.16C406.29 589.65 396.13 550.07 371.77 536.67"/>
+<path id="galho-d-dir" d="M588.7 604.16C617.71 589.65 627.87 550.07 652.23 536.67"/>
+<path id="galho-e-esq" d="M465.7 644.34C417.13 632.2 395.81 592 352 592"/>
+<path id="galho-e-dir" d="M558.3 644.34C606.87 632.2 628.19 592 672 592"/>
+<path id="galho-f-esq" d="M512 768C434.03 744.61 427.31 664 364 664"/>
+<path id="galho-f-dir" d="M512 768C589.97 744.61 596.69 664 660 664"/>
+<path id="galho-g-esq" d="M512 818C441.57 818 458.35 730 402 730"/>
+<path id="galho-g-dir" d="M512 818C582.43 818 565.65 730 622 730"/>
+</g>
+<g id="agentes" fill="none" stroke="#081C15" stroke-width="15">
+<circle id="agente-topo" cx="512" cy="356" r="13.5"/>
+<circle id="agente-a-esq" cx="450" cy="400" r="13.5"/>
+<circle id="agente-a-dir" cx="574" cy="400" r="13.5"/>
+<circle id="agente-b-esq" cx="394" cy="462" r="13.5"/>
+<circle id="agente-b-dir" cx="630" cy="462" r="13.5"/>
+<circle id="agente-c-esq" cx="452" cy="500" r="13.5"/>
+<circle id="agente-c-dir" cx="572" cy="500" r="13.5"/>
+<circle id="agente-d-esq" cx="356" cy="528" r="13.5"/>
+<circle id="agente-d-dir" cx="668" cy="528" r="13.5"/>
+<circle id="agente-e-esq" cx="334" cy="592" r="13.5"/>
+<circle id="agente-e-dir" cx="690" cy="592" r="13.5"/>
+<circle id="agente-f-esq" cx="346" cy="664" r="13.5"/>
+<circle id="agente-f-dir" cx="678" cy="664" r="13.5"/>
+<circle id="agente-g-esq" cx="384" cy="730" r="13.5"/>
+<circle id="agente-g-dir" cx="640" cy="730" r="13.5"/>
+</g></g></svg>

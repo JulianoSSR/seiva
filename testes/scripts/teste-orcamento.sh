@@ -365,7 +365,8 @@ lei "$ARQ" "$ARQ"
 eq "dois arquivos: sai com 2" 2 "$RC"
 
 # --- blocos do harness.md: instalação, atualização e volta da statusline ---------
-# Os blocos saem do próprio harness.md (o texto que o usuário vai rodar) e rodam com HOME temporário.
+# Os blocos históricos vêm de fixture imutável do commit-base e rodam só em HOME temporário.
+# Não são instruções atuais de instalação; a documentação não instala configurações globais.
 bloco() { # bloco <trecho>: imprime o bloco de código da seção "Orçamento vivo" do harness.md que contém o trecho
   awk -v pat="$1" '
     /^## / { em = ($0 ~ /^## Orçamento vivo/) }
@@ -375,12 +376,12 @@ bloco() { # bloco <trecho>: imprime o bloco de código da seção "Orçamento vi
       next
     }
     em && dentro { corpo = corpo $0 "\n" }
-  ' "$RAIZ/referencias/harness.md"
+  ' "$RAIZ/testes/fixtures/harness-statusline-legado.txt"
 }
 BL_A=$(bloco 'statusLine = {')
 BL_UP=$(bloco "install -m 0755 '<caminho absoluto da skill carregada>")
 BL_VOLTA=$(bloco 'del(.statusLine)')
-eq "os três blocos estão no harness.md" "1 1 1" "$([ -n "$BL_A" ] && echo 1 || echo 0) $([ -n "$BL_UP" ] && echo 1 || echo 0) $([ -n "$BL_VOLTA" ] && echo 1 || echo 0)"
+eq "os três blocos estão na fixture histórica" "1 1 1" "$([ -n "$BL_A" ] && echo 1 || echo 0) $([ -n "$BL_UP" ] && echo 1 || echo 0) $([ -n "$BL_VOLTA" ] && echo 1 || echo 0)"
 
 prepara() { # prepara <nome> <bloco> <skill>: grava $T/<nome>.sh com o caminho da skill preenchido
   printf '%s\n' "$2" | sed -e "s|^  SKILL='<.*>' &&\$|  SKILL='$3' \&\&|" -e "s|<caminho absoluto da skill carregada>|$3|" > "$T/$1.sh"

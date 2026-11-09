@@ -1,6 +1,6 @@
 # Terreno: ler as leis do projeto
 
-O objetivo é um perfil curto, de até 150 linhas, que diga o que vale neste projeto. Com ele, nenhum subagente precisa ler a constituição inteira e nenhum ignora uma regra. O perfil é a única informação sobre o projeto que um subagente recebe além da própria tarefa.
+O objetivo é um perfil curto, de até 150 linhas, que diga o que vale neste projeto. Com ele, nenhum subagente precisa ler a constituição inteira e nenhum ignora uma regra. O perfil resume regras com origem. O agente pode conferir as fontes e ampliar o contexto necessário à tarefa.
 
 ## 1. Confirmar o repositório (orquestrador + script)
 
@@ -34,7 +34,7 @@ Procure nesta ordem e anote o que existir:
 5. Verificação: scripts (`scripts/verificar*`, `Makefile`, scripts do `package.json`) e CI (`.github/workflows/`).
 6. Memória do agente, se o harness tiver uma. O subagente não tem acesso a ela: o **orquestrador** lê o índice e passa, no pacote do agente do perfil, os itens que são armadilha conhecida (caminho do repositório, ferramenta que falta, incidente que virou regra).
 
-Documento com mais de ~500 linhas: liste os títulos (`grep -n '^#' arquivo`) e leia só as seções de leis, inegociáveis, protocolo, checklist, status e entrega.
+Documento com mais de ~500 linhas: liste os títulos (`grep -n '^#' arquivo`) e priorize leis, inegociáveis, protocolo, checklist, status e entrega. Leia integralmente quando exigido pelo projeto ou necessário para o contexto, com justificativa breve.
 
 ## 3. Extrair para o perfil
 
@@ -71,7 +71,7 @@ O trecho depois de `::` é o começo do título. A impressão cobre do título a
 - Na criação, as seções L, P, V e E vão ao usuário para confirmação. Na atualização, se alguma dessas quatro mudou, mostre ao usuário o que mudou antes de usar. Os comandos de V são executados por agentes, e um texto estranho numa fonte não pode virar lei sem ninguém ver.
 - A cada tarefa, compare as impressões e refaça só as seções da fonte que mudou. Agente do projeto com impressão `AUSENTE`: a superfície passa a usar a lente da seiva mais próxima, e isso fica anotado.
 - Se o perfil passar de 150 linhas, a sobra vai para `perfil-detalhe.md`, lido só quando uma tarefa tocar aquele assunto.
-- **Varredura do Resina.** O perfil guarda, no cabeçalho, fora das seções refeitas por impressão, a linha `Varredura do Resina:` com um destes valores: `nunca`, `<AAAA-MM-DD> · <caminho do relatório>`, `recusada em <AAAA-MM-DD>` ou `adiada em <AAAA-MM-DD> (orçamento)`. Perfil sem a linha vale como `nunca`. Com `nunca` ou `adiada`, ofereça a varredura (etapa 8 do SKILL.md) uma vez: na criação, junto com a confirmação de L, P, V e E; num perfil existente, na triagem da tarefa, na mesma pergunta das outras operações caras quando o perfil manda perguntar. Antes de oferecer, rode `orcamento-local.sh --leva "invasor:opus revisor:sonnet"`; com `restrito` ou `NÃO CABE`, não ofereça e grave `adiada`; com `sem contar invasor:opus`, diga na oferta que o custo é desconhecido, com o piso da [triagem](triagem.md). Grave a resposta na hora: a tarefa seguinte não oferece de novo. Com `recusada`, só a pedido do usuário.
+- **Varredura do Resina.** O perfil guarda, no cabeçalho, fora das seções refeitas por impressão, a linha `Varredura do Resina:` com um destes valores: `nunca`, `<AAAA-MM-DD> · <caminho do relatório>`, `recusada em <AAAA-MM-DD>` ou `adiada em <AAAA-MM-DD> (orçamento)`. Perfil sem a linha vale como `nunca`. Com `nunca` ou `adiada`, ofereça a varredura (etapa 8 do SKILL.md) uma vez: na criação, junto com a confirmação de L, P, V e E; num perfil existente, na triagem da tarefa, na mesma pergunta das outras operações caras quando o perfil manda perguntar. Antes de oferecer, confira capacidades e orçamento pela integração detectada; com `restrito` ou `NÃO CABE`, não ofereça e grave `adiada`; sem histórico comparável, declare o custo desconhecido; exemplo antigo não é previsão desta tarefa. Grave a resposta na hora: a tarefa seguinte não oferece de novo. Com `recusada`, só a pedido do usuário.
 
 ## 6. Quem faz
 

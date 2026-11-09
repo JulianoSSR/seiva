@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "base_commit": "a181dc83b913f8123875ac8544f97e8a1c211ef2",
+  "commands": [
+    {
+      "command": "bash scripts/testar.sh",
+      "exit": 0,
+      "duration_seconds": 32.217,
+      "log": ".seiva/evidencias-evolucao/validacao-seis-capacidades.log"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0
+    },
+    {
+      "command": "git diff --cached --quiet",
+      "exit": 0
+    }
+  ],
+  "python_tests": 180,
+  "shell_suites": 11,
+  "baseline_pristine_shell_suites_passed": 11,
+  "real_model_evaluations": null,
+  "economy_percent": null,
+  "codex_rpc_version": "0.167.0-alpha.3.2",
+  "codex_rpc_catalog_entries": 8,
+  "codex_rpc_errors": [],
+  "codex_rollout_events_recognized": 7,
+  "logo_sha256": "d58f601be681546fe5f9734ac8ab4c94229b30b66f34857d20d4f222864c0dde",
+  "private_evidence_directory": ".seiva/evidencias-evolucao",
+  "limitations": [
+    "nenhum custo total atribuído da tarefa",
+    "fixtures não demonstram economia real",
+    "revisão independente do Claude Code pendente"
+  ],
+  "learning_tests": 67,
+  "historical_shell_assertions": 1162,
+  "historical_shell_assertions_note": "Contagem da primeira validação; não recontada na execução final."
+}

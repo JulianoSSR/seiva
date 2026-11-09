@@ -1,49 +1,37 @@
 # Categorias de modelo
 
-O orquestrador pede uma **categoria**; o mapa abaixo, ou a seção M do perfil, resolve para o modelo do harness. Assim a skill não envelhece quando sai modelo novo: muda só o mapa.
+A categoria descreve capacidade necessária, não uma marca ou um preço fixo. O mapa do ambiente é detectado no início da tarefa e guardado no perfil com fonte, data e limitações.
 
-| Categoria | Serve para | Sinal de categoria errada |
-|---|---|---|
-| `script` | contar, listar, hash, diff, rodar teste, lint e build, extrair campos | nenhum: se é mecânico, é script |
-| `rapido` | localizar código, ler e resumir arquivos, medir premissa com comando, medir uma suspeita | precisou interpretar regra de negócio ou decidir entre caminhos |
-| `padrao` | implementar tarefa bem descrita, escrever teste, plano, adversário e lentes em N2, verificação, montar o perfil | deu mais de duas voltas no mesmo erro |
-| `forte` | plano e lentes em N3, implementação delicada (migração, concorrência, cálculo), julgamento difícil | — |
-| `profundo` | adversário em N3, decisão de arquitetura, bug que resistiu a duas tentativas | — |
+| Categoria | Uso |
+|---|---|
+| `script` | contagem, hash, diff, teste, extração e validação determinística |
+| `rapido` | localização, extração curta e premissa mensurável |
+| `padrao` | implementação delimitada, teste, plano e revisão N2 |
+| `forte` | plano e lentes N3, implementação delicada |
+| `profundo` | adversário N3, arquitetura e defeito persistente |
 
-O orquestrador é o modelo da sessão. Se a sessão está num modelo pequeno e a tarefa é N3, peça ao usuário uma sessão mais forte.
+## O que otimizar
 
-## Regras
+O alvo é o menor consumo **total** que mantenha os critérios de qualidade. Inclua orquestrador, todos os agentes, tentativas interrompidas, repetição, contexto retransmitido, cache e retomadas. Compare volume bruto de tokens, preço e unidades ponderadas separadamente: modelo de menor preço pode gastar mais tokens para concluir.
 
-1. **A categoria vem da tarefa, não do papel.** Implementar uma migração delicada é `forte`, mesmo sendo "só implementação".
-2. **O revisor fica acima do construtor, ou em outro modelo, quando o risco pede.** Em N3, o construtor é `forte` e o adversário é `profundo`. Em N2, os dois ficam no `padrao`: o adversário é outra instância, de contexto limpo, e a independência declarada é `mesmo-modelo-contexto-limpo`. Projeto que quer o adversário de N2 acima do construtor diz isso na seção M do perfil (`N2: adversário forte`). Nunca é a mesma instância.
-3. **Escalada**, a regra única para toda repetição (verificação que falhou, correção de achado, relatório sem prova):
-   - rodada 2: agente novo, **mesma** categoria, com o erro anterior no pacote: o caminho da saída guardada e até 3 linhas de resumo, nunca a saída inteira;
-   - rodada 3: uma categoria acima;
-   - `profundo` que falha: pare e leve ao usuário. Não existe categoria acima.
-4. **Voltas custam mais que preço.** Se o `rapido` precisaria de um passo a passo longo demais para acertar, use o `padrao`.
-5. **Modelo pequeno pede prompt explícito:** passos numerados, critério de pronto, o que não fazer e formato de saída.
-6. **Independência declarada.** Da mais forte para a mais fraca: `outro-provedor`, `outro-modelo`, `mesmo-modelo-contexto-limpo`, `mesmo-contexto`. Toda revisão registra qual teve.
-7. **Tokens:** o custo de cada subagente e do orquestrador vem do `scripts/medir.sh`, que lê os transcripts com a régua do orçamento e conta as corridas que caíram no limite ([harness](harness.md#medição-da-tarefa)). O número que o Claude Code informa na notificação de fim é só o da última corrida, sem a leitura de cache: na tarefa de logs do ciclo-arboris (2026-10-05), um construtor informou 269 mil e gastou 1,10 mi, porque duas corridas caíram antes da que fechou. É o dado que compara o custo real com o orçamento da triagem, e o histórico dele prevê o custo da próxima leva.
+1. Use script quando não houver julgamento.
+2. Escolha a menor categoria que dê conta com evidência. Não use um modelo pequeno se ele precisar de sucessivas correções ou de um pacote enorme.
+3. Meça ao fim da tarefa com a fonte disponível. Notificação de término não cobre necessariamente cache nem tentativas anteriores.
+4. Não declare economia sem base comparável. A avaliação em [AVALIACOES](../docs/AVALIACOES.md) controla tarefa, qualidade e fonte.
 
-## Modelo indisponível
+## Independência
 
-A conta pode não ter acesso a uma categoria (limite de uso, crédito, modelo que o harness não oferece). Indisponibilidade **não conta como falha** para a escalada. Quando acontecer:
+Quem implementa não aprova. Ordem de diversidade: `outro-provedor`, `outro-modelo`, `mesmo-modelo-contexto-limpo`, `mesmo-contexto`. A última é autoconferência e não substitui o portão independente exigido.
 
-1. Desça uma categoria (`profundo` → `forte` → `padrao`) e siga. Não tente de novo o mesmo modelo na mesma tarefa.
-2. Registre em `registro.md` uma decisão: `D-n: profundo indisponível, usado forte — custo se errado: <o que a categoria de cima pegaria>`.
-3. Se a descida deixar o revisor no mesmo modelo do construtor, mantenha o contexto limpo e declare `mesmo-modelo-contexto-limpo`. Em N3, ofereça a revisão por outro provedor ([harness](harness.md)).
-4. Anote a indisponibilidade na seção M do perfil (`profundo → forte, desde AAAA-MM-DD`) para não pagar a falha em toda tarefa. Quando o usuário disser que o acesso voltou, apague a linha.
-5. A entrega diz qual categoria foi rebaixada e em que etapa.
+N2 admite outra instância no mesmo modelo, de contexto limpo. N3 requer a diversidade prevista no perfil e na triagem. Se o ambiente não consegue fornecê-la, declare a lacuna antes de prosseguir; não a esconda atrás de um nome de papel.
 
-## Mapa por harness
+## Repetição e indisponibilidade
 
-Conferido em 2026-09. Os nomes do Claude Code são os aceitos pela ferramenta de subagente. Os demais vieram de documentação e de changelogs, parte deles de fontes secundárias; **confira antes do primeiro uso** e grave o mapa certo na seção M do perfil.
+- Rodada 2: nova instância, mesma categoria, pacote com o erro e a evidência anterior.
+- Rodada 3, se o portão permitir: categoria acima. Ao esgotar a categoria ou o teto, interrompa e registre a pendência.
+- Falta de acesso, saldo ou suporte é indisponibilidade, não prova de que a categoria inferior serve.
+- **Nunca rebaixe automaticamente tarefa ou revisão sensível.** Preserve o nível e os requisitos; espere, troque por capacidade equivalente comprovada ou leve as opções ao responsável.
+- Em tarefa não sensível, uma alternativa menor exige justificativa registrada, critérios de verificação preservados e autorização quando as regras do projeto a exigirem.
+- Não grave uma indisponibilidade momentânea como rebaixamento permanente. Registre quando foi observada e confira novamente quando houver sinal de mudança.
 
-| Categoria | Claude Code | Codex CLI | Gemini CLI | Cursor / OpenCode |
-|---|---|---|---|---|
-| `rapido` | `haiku` | modelo rápido da família atual (em 2026-09, `gpt-6-luna`) | Flash | id do provedor, no formato do harness |
-| `padrao` | `sonnet` | `gpt-6-sol` | Pro | idem |
-| `forte` | `opus` | `gpt-6-astra`, esforço `medium` | Pro, esforço alto | idem |
-| `profundo` | `fable` | `gpt-6-astra`, esforço `xhigh` | Deep Think | idem |
-
-No Cursor, o esforço vai entre colchetes no id (`modelo[effort=high]`). No OpenCode, o formato é `provedor/modelo`, e subagente sem `model` herda o do agente que o chamou.
+Nomes de modelos, esforço e parâmetros pertencem ao adaptador. Não copie mapas antigos de outra conta como se estivessem disponíveis aqui.

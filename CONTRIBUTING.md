@@ -1,6 +1,6 @@
 # Como contribuir
 
-A seiva é aberta a proposta de qualquer pessoa. Ela precisa continuar pequena, barata e fiel às regras do projeto em que roda. Por isso toda mudança passa pelos mesmos filtros.
+**Propostas precisam de evidência e revisão independente.** A Seiva é aberta a proposta de qualquer pessoa. Ela precisa continuar pequena, barata e fiel às regras do projeto em que roda. Por isso toda mudança passa pelos mesmos filtros.
 
 ## O que uma proposta precisa ter
 
@@ -28,3 +28,13 @@ Rode também, à mão, os casos de `testes/casos.md` que a mudança toca, e diga
 ## Estilo
 
 Português do Brasil, direto, sem caixa-alta de ênfase nem ameaça. Cada regra diz o que fazer, e o porquê quando ele não é óbvio.
+
+## Fichas de aprendizado
+
+O [canal de propostas](referencias/aprendizado.md) recebe dados validados, sem código ou conteúdo de projeto cliente. O cliente propõe o conceito; o mantenedor reproduz contra base confiável e prepara mudança separada. Não executar script de PR externo para validar a própria contribuição.
+
+`testes/casos.md` é catálogo textual e não substitui testes executáveis. Rode `bash scripts/testar.sh`; registre separadamente testes automáticos, avaliações com modelos e revisão humana. Comunicação à pessoa segue [as regras didáticas](referencias/comunicacao.md).
+
+## Bloco de entrega
+
+O agente prepara o bloco; o usuário executa commit e push. Use arquivos explícitos, sem `git add .`/`-A`, comandos entre chaves com `&&`, estatística antes de gravar e pausa indicando o esperado. Commit não inclui assinatura/trailer de IA. Verifique que o status dos documentos acompanha a mudança; preserve itens já staged de outra sessão. O bloco solicitado nesta parceria termina em `git push`, sem o agente executá-lo.

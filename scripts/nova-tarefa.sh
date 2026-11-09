@@ -55,7 +55,9 @@ if [ -e "$destino" ]; then
   exit 1
 fi
 
-mkdir -p "$destino/relatorios"
+mkdir -p "$base/tarefas"
+mkdir "$destino" || { echo "já existe ou não pode criar: $destino" >&2; exit 1; }
+mkdir "$destino/relatorios"
 sed -e "s/{{DATA}}/$dia/g" -e "s/{{SLUG}}/$slug/g" "$skill/moldes/registro.md" > "$destino/registro.md"
 sed -e "s/{{SLUG}}/$slug/g" "$skill/moldes/plano.md" > "$destino/plano.md"
 sed -e "s/{{SLUG}}/$dia-$slug/g" "$skill/moldes/progresso.md" > "$destino/progresso.md"
@@ -77,4 +79,6 @@ sid=${sid//[^A-Za-z0-9._-]/}
   echo '```'
 } >> "$destino/registro.md"
 
+# A base contém os bytes atuais, inclusive alterações anteriores; nenhuma edição de produto ocorre aqui.
+python3 "$skill/scripts/estado_tarefa.py" init "$destino"
 echo "$destino"

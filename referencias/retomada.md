@@ -1,51 +1,51 @@
-# Retomada: a sessão é descartável, a tarefa não
+# Retomada: confira antes de aproveitar
 
-O estado de uma tarefa mora em arquivo, na pasta dela. A sessão do orquestrador pode cair por limite de uso, por contexto cheio ou porque o app fechou, e nada se perde nem se paga duas vezes. Funciona igual no terminal e no app desktop: são arquivos e scripts, sem statusline e sem hook.
+A sessão é descartável; a tarefa guarda contexto, base, escopo, tentativas e evidência. Pacotes, estado e relatórios de execução são privados e ignorados pelo git.
 
-## Os dois arquivos
+## Estado canônico
 
-- **`progresso.md`**: o checklist das etapas 0 a 9, escrito só pelo `scripts/progresso.sh`. Etapa feita leva o hash dos artefatos dela.
-- **`contexto-tarefa.md`**: objetivo, nível e motivo, etapa atual, a próxima ação em até 3 linhas, as decisões que esperam o usuário, os arquivos-chave e o orçamento gasto. Alvo: até 1.500 tokens; o `progresso.sh conferir` estima o tamanho e avisa quando passa.
+`estado.json` é a fonte de verdade. Guarda `schema`, `task_id`, caminho, repositório, base, escopos, etapas, dependências e tentativas. `progresso.md` é projeção gerada, não arquivo para editar à mão. `contexto-tarefa.md` resume objetivo, próxima ação, bloqueios e caminhos, sem substituir o JSON.
 
-O `registro.md` continua sendo o histórico da tarefa (triagem, decisões, agentes, arquivos entregues). Para retomar, a sessão nova não o lê. Cada fato fica num lugar só: a próxima ação no contexto, o estado das etapas no progresso.
+Uma etapa feita só é reutilizada quando os artefatos e as dependências continuam válidos. Hash alterado invalida a prova anterior e pede julgamento direcionado; não exige repetir toda a tarefa.
 
-## Quando escrever
+## Criar e delimitar
 
-| Momento | O que fazer |
-|---|---|
-| Fechou uma etapa | `progresso.sh <pasta-da-tarefa> marcar <n> feita <artefatos>`; reescreva o `contexto-tarefa.md` |
-| Antes de cada leva | `orcamento-local.sh --tarefa <pasta> --leva "<papel>:<modelo> ..."`; grave o pacote de cada agente em `relatorios/pacote-<papel>-r<n>.md`; atualize só a Próxima ação: quem vai ser disparado e o relatório que cada um deve deixar |
-| Rodada nova num portão | `progresso.sh <pasta-da-tarefa> marcar <n> "em-curso: rodada 2/2"` |
-| Parada limpa | os dois arquivos em dia e uma linha na seção Retomada do `registro.md` |
+```bash
+bash scripts/nova-tarefa.sh <pasta-de-trabalho> <slug>
+bash scripts/base-tarefa.sh <tarefa> --exclusive caminho/arquivo outro/arquivo
+```
 
-A atualização antes da leva é uma edição de 3 linhas, não a reescrita do arquivo.
+A primeira chamada registra base e foto da árvore, preservando índice e alterações locais. A segunda adquire o escopo antes da edição e confere a base. Base e snapshot não provam autoria; arquivo alterado por outra sessão não passa a pertencer à tarefa. Conflito exige combinar a divisão.
 
-## Parada limpa
+`diff-tarefa.sh <tarefa> <arquivos>` usa a base e o escopo registrados. Em legado sem base confiável, interrompa para reconstruir a proveniência com o responsável; nunca substitua a base por HEAD atual silenciosamente.
 
-Os gatilhos vêm do `orcamento-local.sh`, que roda antes de cada leva: `parar` pela janela de 5 horas (85%, ou o aviso de limite batido) ou pelo contexto desta sessão em 70% da janela do modelo. A parada acontece na fronteira entre levas: o agente em curso termina.
+## Registrar uma tentativa
 
-1. Reescreva o `contexto-tarefa.md`, com a Próxima ação dizendo o que a sessão nova faz primeiro, e marque no `progresso.md` a etapa em curso.
-2. Escreva uma linha na seção Retomada do `registro.md`: a data, o motivo e "retomar por contexto-tarefa.md".
-3. Pare e diga ao usuário, com o caminho absoluto:
-   - parada por contexto: `abra uma sessão nova agora e diga: retome <pasta>/contexto-tarefa.md`;
-   - parada pela janela de 5 horas: `abra uma sessão nova depois das HH:MM e diga: retome <pasta>/contexto-tarefa.md`, com a hora que a linha do orçamento traz.
+```bash
+python3 scripts/estado_tarefa.py attempt-start <tarefa> <id> <agente> <pacote> <relatorio>
+python3 scripts/estado_tarefa.py attempt-complete <tarefa> <id> concluido --artifact <relatorio> --evidence '<comando e resultado>'
+python3 scripts/estado_tarefa.py attempt-check <tarefa> <id>
+```
 
-**Pausa longa também é parada.** O cache do contexto vive pouco: o transcript mostra o tempo de vida (`ephemeral_1h` ou `ephemeral_5m`). Voltar a uma sessão grande depois disso faz a 1ª resposta reescrever o contexto inteiro. Medido em 2026-10-13: uma sessão de 374 mil tokens, parada por 70 minutos com cache de 1 hora, gastou 373.540 tokens de escrita de cache numa resposta só. Por isso, ao entregar ou ao parar para esperar o usuário com o contexto acima de 200 mil, o orquestrador deixa o `contexto-tarefa.md` em dia e diz, em uma linha: "se for voltar depois de mais de 1 hora, abra uma sessão nova e diga: retome <caminho>".
+Etapa de agente exige --attempt com terminal concluído válido e hashes dos artefatos. Etapa mecânica exige --evidence explícita e artefatos não vazios. Marcar feita apenas com texto de status não conclui. Grave pacote e próxima ação antes do disparo. O terminal vincula tarefa, tentativa, artefato, hash e evidência. O relatório exige conteúdo e última linha exata `<!-- seiva:fim TASK_ID ATTEMPT_ID -->`, produzida pelo agente ao finalizar com os IDs do pacote. Não acrescentar depois para aproveitar relatório velho; sem marcador válido, não conclui. O orquestrador confere o resultado do agente; não basta o agente declarar sucesso. Relatório velho, de tentativa anterior, ausente ou modificado não valida a tentativa atual.
 
-Nunca sugira "Tentar novamente" numa sessão grande. Depois da pausa, retomar a mesma sessão recria o cache do contexto inteiro: as maiores quebras medidas foram de 800 a 940 mil tokens (session-report, 30 dias, uma máquina, 2026-09-29). Parar com 70% de contexto também evita a compactação automática, que relê a conversa inteira para resumi-la e perde referências pelo caminho.
+## Conferir e retomar
 
-## Retomar
+```bash
+bash scripts/progresso.sh <pasta-de-trabalho> pendentes
+bash scripts/progresso.sh <tarefa> conferir
+bash scripts/progresso.sh <tarefa> marcar <etapa> feita <artefatos> --attempt <id>
+bash scripts/progresso.sh <tarefa> marcar 7 feita provas.txt --evidence 'comando executado: exit 0, resultado em provas.txt'
+```
 
-Vale para "retome <caminho>", para "continue" ou "tentar novamente" com tarefa em curso, para a sessão que voltou de pausa por limite de uso e para contexto compactado. O usuário não precisa pedir: o orquestrador percebe a situação e segue estes passos sozinho.
+Sem caminho, liste pendentes; com várias tarefas, pergunte qual. Leia contexto curto e saída do conferir. Abra regras atuais exigidas pelo projeto e fontes necessárias à próxima ação. Não releia todo o histórico nem dispense leitura obrigatória do projeto.
 
-1. Sem caminho, rode `progresso.sh <pasta-de-trabalho> pendentes`. Com uma tarefa na lista, siga com ela. Com mais de uma, pergunte qual, numa pergunta só. Com a pasta de uma tarefa no lugar da de trabalho, o script sai com código 2 e diz qual pasta espera.
-2. Leia o `contexto-tarefa.md` e rode `progresso.sh <pasta-da-tarefa> conferir`. Só isso: nem o `registro.md`, nem os relatórios, nem a conversa anterior.
-3. Siga da linha `PROXIMA`. Etapa feita não roda de novo. Artefato que `MUDOU` depois de feito pede que você abra o artefato e decida, porque outra sessão ou uma rodada de correção pode tê-lo mudado de propósito; não é motivo para refazer a etapa.
-4. Leva que caiu no meio: redispare só o agente cujo relatório não está em `relatorios/`, pelo pacote gravado em `relatorios/pacote-*.md`.
-5. Abra outro arquivo só quando a Próxima ação pedir, e só o trecho necessário.
+Uma leva interrompida é retomada por **tentativas válidas**, não pela presença de relatórios. Reutilize terminais verificados; redispare apenas a tentativa sem conclusão válida, com novo ID quando necessário. Resultado tardio da tentativa antiga não conclui a nova.
 
-Se a mesma sessão voltou de uma pausa por limite de uso, rode o `orcamento-local.sh` antes de tudo. Com o contexto em 70% ou mais, faça a parada limpa em vez de seguir: a sessão nova sai mais barata que a velha.
+## Migração e parada limpa
 
-Tarefa criada antes da 1.2.0 não tem `progresso.md`: retome pela seção Retomada do `registro.md`, como antes, e crie os dois arquivos ao fechar a etapa em curso (`progresso.sh marcar` cria o progresso pelo molde).
+Os wrappers preservam os comandos básicos e migram estado legado de forma explícita. Conclusão feita legada sem comprovação fica não comprovada e exige revalidação; o histórico permanece preservado. Migração não inventa base, propriedade de arquivos, aceite ou prova. Preserve originais e declare campos sem evidência; o estado só avança depois de conferir os requisitos faltantes.
 
-**Medida:** no ensaio de `testes/scripts/teste-progresso.sh`, uma tarefa N2 que caiu no meio da leva de ataque ao plano retoma lendo cerca de 700 tokens: o contexto, o progresso e a saída do `conferir`, estimados por bytes. Com o `contexto-tarefa.md` no teto de 1.500, a conta fica perto de 2.000. Fora dessa conta fica o contexto fixo que toda sessão nova carrega: instruções do projeto, memória e ferramentas.
+Ao chegar ao teto de custo, contexto, rodadas ou capacidade: não abra outra leva; guarde próxima ação, tentativas em curso, achados abertos, orçamento e artefatos. Diga motivo e caminho absoluto para retomar. Uma pausa não aprova o portão e não autoriza rebaixamento.
+
+Intervalo de tarefa e sessão são distintos. Ao medir, use as marcas verificáveis da tarefa; se só houver uma marca, não atribua a sessão inteira sem demonstrar exclusividade.

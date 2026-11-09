@@ -1,5 +1,22 @@
 # Registro de mudanças
 
+## Em desenvolvimento
+
+- Seis capacidades adaptadas com prova/reflexão privadas obrigatórias, candidato não comprovado sem sugestão, extração mecânica de cache e microajuste apenas conceitual. Logs/caminhos/hashes da origem não são exportados; ajuste de regras e execução privilegiada não ocorrem durante a tarefa cliente.
+
+- Comunicação didática: conclusão primeiro, linguagem simples e visuais conforme dados/fluxo, sem agentes adicionais de formatação.
+- Aprendizado por eventos, catálogo fechado sem conteúdo do projeto, alvo estimado de 100 tokens, deduplicação e frequência limitada. Consentimento vinculado à ficha/título/corpo/canal; falha preserva sem retry cego.
+- Recepção validada de dados e papel Mantenedor separados da execução privilegiada; pacote de triagem não inicia modelo nem habilita merge.
+
+- Núcleo independente de aplicativo, menor e carregado por assunto. Modelos são escolhidos pela capacidade e pelo consumo total previsto, incluindo revisão, retrabalho e retomada; preço por token fica separado.
+- Revisão pode conferir o mapa do batedor, descobrir dependentes e ampliar a leitura até arquivo inteiro com motivo breve. Graves exigem correção verificada ou aceite explícito permitido; teto interrompe sem aprovar.
+- Estado canônico em JSON, base da tarefa e escopo explícito. Conclusão vincula tentativa, artefatos, hashes e evidência; Markdown é projeção. Migração legada preserva histórico e exige revalidar conclusão sem prova.
+- Monitor e seleção entram sob demanda, com capacidades detectadas, fonte e intervalo de uso, reserva compartilhada e duração de acompanhamento delimitada. Sem agentes ou configuração global persistente.
+- Resina acompanha entrada, validação, autorização e sink. Prova executável requer escopo autorizado, isolamento e dados sintéticos; outra instância julga.
+- Execução e aprendizado local são privados; documentação, casos e avaliações sanitizados são versionáveis. Notificação de término e sessão inteira não substituem contabilidade atribuída à tarefa.
+- Símbolo original incorporado sem mudar geometria ou cores; README usa caminho relativo e texto alternativo.
+- Protocolo de avaliação em `docs/AVALIACOES.md` distingue validação funcional de economia demonstrada. Novos casos cobrem independência, fechamento, tentativas antigas, concorrência, isolamento, custo e monitor.
+
 ## 1.5.0 (2026-11-02)
 
 O mestre invasor, apelidado Resina, pedido em 2026-10-28: "testar ao limite como invadir e/ou corromper o projeto, listar todas as falhas e traçar um plano de correção".

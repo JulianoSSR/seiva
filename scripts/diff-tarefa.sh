@@ -33,22 +33,4 @@ if abs=$(cd -- "$pasta" 2>/dev/null && pwd -P); then
     done
   fi
 fi
-saida="$pasta/diff.patch"
-: > "$saida"
-
-for f in "$@"; do
-  if git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
-    git diff HEAD -- "$f" >> "$saida"
-    estado="alterado"
-    [ -e "$f" ] || estado="apagado"
-  elif [ -e "$f" ]; then
-    # Arquivo novo: diff contra o vazio. O exit 1 do --no-index é esperado (há diferença).
-    git diff --no-index -- /dev/null "$f" >> "$saida"
-    estado="novo"
-  else
-    estado="nao-existe"
-  fi
-  printf '%-10s %s\n' "$estado" "$f"
-done
-
-printf 'linhas no diff: %s  ->  %s\n' "$(wc -l < "$saida")" "$saida"
+exec python3 "$(dirname -- "$0")/estado_tarefa.py" diff "$pasta" "$@"

@@ -17,9 +17,9 @@ Modelos avaliam melhor o próprio texto (autopreferência), tendem a concordar c
 | Plano (etapa 4) | — | adversário + lentes acionadas, até 2 rodadas | adversário + lentes, até 3 rodadas | `plano.md`, relatório do batedor, fichas e `trechos.md` |
 | Código (etapa 8) | 1 revisor (a lente acionada, ou o adversário), 1 rodada | adversário em 1 rodada; lente só com sinal novo no diff; 2ª rodada só por CRÍTICO confirmado | lentes recalculadas pelo diff + adversário, até 3 rodadas | `diff.patch` (de `scripts/diff-tarefa.sh`), `plano.md`, fichas dos arquivos do diff, IDs abertos de `achados.md` |
 
-Revisores rodam em paralelo e só leem. Nenhum revisor corrige o que audita.
+Revisores rodam em paralelo quando houver capacidade e só leem. Nenhum revisor corrige o que audita. Fichas e mapa do batedor são o ponto de partida: o revisor pode descobrir fora do mapa, rastrear dependentes e ler arquivo inteiro quando necessário, com justificativa breve.
 
-**N2, portão do código.** Em N2 as lentes atacam o plano, onde a proteção ainda é barata. No diff, o adversário revisa sozinho, a não ser que o diff real acione um sinal que o plano não previa (uma rota nova, uma escrita em tabela que não estava nas tarefas): aí entra a lente desse sinal, e só ela. Lente que atacou o plano não roda de novo. A exceção é a segurança: com a lente de segurança acionada, o Resina revisa o diff em modo mudança ([triagem](triagem.md)). Cada achado dela, se foi aceito, virou tarefa ou risco `R-n` no plano: o verificador confere na etapa 7 se a mitigação está no código, e o adversário cita o ID em uma linha (`A-3 → mitigado em arquivo:linha`) quando passa por ele. ALTO confirmado no diff volta ao implementador, e o orquestrador confere o conserto com o comando e o `arquivo:linha`, sem rodada nova de revisor; a entrega diz que essa conferência não teve revisor independente.
+**N2, portão do código.** Em N2 as lentes atacam o plano, onde a proteção ainda é barata. No diff, o adversário revisa sozinho, a não ser que o diff real acione um sinal que o plano não previa (uma rota nova, uma escrita em tabela que não estava nas tarefas): aí entra a lente desse sinal, e só ela. Lente que atacou o plano não roda de novo. A exceção é a segurança: com a lente de segurança acionada, o Resina revisa o diff em modo mudança ([triagem](triagem.md)). Cada achado dela, se foi aceito, virou tarefa ou risco `R-n` no plano: o verificador confere na etapa 7 se a mitigação está no código, e o adversário cita o ID em uma linha (`A-3 → mitigado em arquivo:linha`) quando passa por ele. ALTO confirmado no diff volta ao implementador; outra instância confere o conserto com o comando e o `arquivo:linha`, com prova direcionada, sem repetir toda a exploração. Se faltar capacidade para conferir, o achado continua aberto.
 
 **Pedido de rigor sem superfície sensível** ([triagem](triagem.md)): N1 com dois revisores no portão do código, de modelos diferentes quando der.
 
@@ -43,17 +43,17 @@ Para cada achado, o orquestrador:
 
 5. **Registra** em `achados.md` uma linha de veredito por achado: `A-3 → confirmado · plano · agrupado com A-5 (mesma causa)`.
 
-Nenhum achado some em silêncio.
+Nenhum achado some em silêncio. Correção exige verificação e evidência atual; aceite exige responsável, data, escopo, motivo, risco e autorização permitida. Inegociável não admite aceite. Adiar não encerra grave bloqueante.
 
 ## Critério de parada
 
 - Teto por portão: **1 rodada em N1, 2 em N2 e 3 em N3**.
 - Uma rodada só é aberta por achado **CRÍTICO ou ALTO confirmado**. No portão do código em N2, só por **CRÍTICO**.
-- O portão fecha quando uma rodada termina sem CRÍTICO nem ALTO confirmado **novo**.
-- Estourou o teto com CRÍTICO ou ALTO aberto: pare e leve ao usuário o achado, as tentativas e as opções.
+- O portão fecha somente quando todos os CRÍTICOS e ALTOS confirmados estão corrigidos e verificados, ou têm aceite explícito do responsável permitido pelas regras. Ausência de achado novo não encerra os anteriores.
+- Estourou o teto com CRÍTICO ou ALTO aberto: interrompa sem aprovar e leve ao usuário o achado, as tentativas e as opções.
 - Revisão de uma rodada seguinte recebe só o que mudou (o registro de mudanças do plano, ou o diff novo) e as linhas dos achados abertos em `achados.md`, não o texto inteiro deles nem tudo de novo.
 
-O ganho da revisão cai rápido depois da segunda rodada; estudos de debate entre modelos mostram o platô por volta da terceira. Rodada a mais além disso é custo sem retorno.
+O teto evita repetição sem progresso; não prova que revisão adicional seria inútil nem autoriza entregar uma falha grave sem fechamento.
 
 ## O que não é achado
 
@@ -64,7 +64,7 @@ Vale para todas as lentes:
 - "falta teste" genérico, sem apontar o comportamento que ficaria descoberto;
 - dependência desatualizada sem falha conhecida que se aplique aqui;
 - negação de serviço teórica sem vetor;
-- problema já existente antes da mudança e fora do escopo. Esse vira `adiar`, com a anotação "preexistente", e não bloqueia;
+- problema preexistente sem relação com o fluxo alterado. Se a mudança o torna alcançável ou amplia seu risco, julgue no portão atual. Nos demais casos vira `adiar`, com a anotação "preexistente", e não bloqueia;
 - arquivo que é só teste, a não ser que o teste esteja provando a coisa errada.
 
 ## Independência honesta

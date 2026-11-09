@@ -1,0 +1,273 @@
+{
+  "schema": 1,
+  "base_commit": "a181dc83b913f8123875ac8544f97e8a1c211ef2",
+  "content_sha256": "ff8fb8f4268837e41fc2f0ed0fadbea4d166914366848b529992b553a58e49a3",
+  "digest_algorithm": "SHA-256 do JSON UTF-8 de files, sort_keys=True, ensure_ascii=False, separators=(virgula, dois-pontos), sem espaços",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "92c6fa8cd78e3b061b3c42353d0746b57475eefdd038c539eb94f37a3067c778",
+      "size": 91
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "7b503c85abf52e6dd3c72f11688d57fd84d98a2cf4657bf0ea69d6b12dc37b6d",
+      "size": 41766
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "9b859df04f001c00ded291d04a3366edc7a10cac52b9045bde63820eae209121",
+      "size": 2518
+    },
+    {
+      "path": "MEMORY.md",
+      "sha256": "6cdbec6dfb0f6c6437fc5bc31290322d277a678c97edf1722f70ecf9e1910b29",
+      "size": 4193
+    },
+    {
+      "path": "README.md",
+      "sha256": "28d4832d2d9d07e5000e375bf69ab55a9ffc087cf97af5cfa313dc69360cb378",
+      "size": 4346
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "abfaa63305faefb54174512b64503bc01b6bfaf385695056bc69168f18d6b88a",
+      "size": 11687
+    },
+    {
+      "path": "assets/identidade/seiva-simbolo-escuro.svg",
+      "sha256": "d58f601be681546fe5f9734ac8ab4c94229b30b66f34857d20d4f222864c0dde",
+      "size": 2486
+    },
+    {
+      "path": "docs/AVALIACOES.md",
+      "sha256": "108009fc0a3e19809544067e38d1bb33aeaa1f2ebe0e7e4ed803d48ceec06b41",
+      "size": 5183
+    },
+    {
+      "path": "docs/validacao/resultados.json",
+      "sha256": "4f411052e0c89aeceee62bdb578694d66709d910cde8c0ade3a993667e68b2d2",
+      "size": 1207
+    },
+    {
+      "path": "insights/README.md",
+      "sha256": "6c928b39fb168e59f3772abf53db41d9f6ba9ec402d9357c1f2aa837bbf5454e",
+      "size": 1206
+    },
+    {
+      "path": "insights/schema-v1.json",
+      "sha256": "f1232b28f94b3b81a8562d3d7b2fd43491e12202b67608097adde45820ed61d1",
+      "size": 8325
+    },
+    {
+      "path": "moldes/contexto-tarefa.md",
+      "sha256": "da8e1de2785e7641b30231a5bda89ff49978d1a814beb90402a4c25368acea36",
+      "size": 1227
+    },
+    {
+      "path": "moldes/perfil.md",
+      "sha256": "fbfb212652940018c9781f3b29cdca975301e9f76bd7058b1fce937b18bef672",
+      "size": 2063
+    },
+    {
+      "path": "moldes/progresso.md",
+      "sha256": "c9c63f8df7e058e3807f573528333e2e68b2855f0a34ba4cd9d1d4b34e7c5688",
+      "size": 785
+    },
+    {
+      "path": "moldes/registro.md",
+      "sha256": "4b1fa01c3e0dde398afbd29ea5c93572dffa7a78745ea45b65d765805cb58ced",
+      "size": 1479
+    },
+    {
+      "path": "papeis/adversario.md",
+      "sha256": "9479d9a1a2dee2b77736d7113e4baa18abcdf077c48d3a162e1edb769eff1f47",
+      "size": 2499
+    },
+    {
+      "path": "papeis/batedor.md",
+      "sha256": "3642851341d87b09bb02c1396535a3923a5d7c0879e77577eaa9d27306fa86ad",
+      "size": 2227
+    },
+    {
+      "path": "papeis/invasor.md",
+      "sha256": "4db79524cba5e8f2882db86e590c8451cb540b5fb66890c328dccb6d55cc5160",
+      "size": 4045
+    },
+    {
+      "path": "papeis/mantenedor.md",
+      "sha256": "295829d814714914f29bce3def0d0b5a285b1c3969293c56cc8a156bd3f087f8",
+      "size": 2341
+    },
+    {
+      "path": "papeis/verificador.md",
+      "sha256": "74496a2739d20a11a0d7462e66de3e776cdc9050def3229fe6c946a2f1abd5b9",
+      "size": 2520
+    },
+    {
+      "path": "referencias/aprendizado.md",
+      "sha256": "8eacebaf24266094b814cd72324bdac1c511a3ea2dd9a1ef4086583cef31c1e6",
+      "size": 9093
+    },
+    {
+      "path": "referencias/autoaperfeicoamento.md",
+      "sha256": "84a08b95a55487c25330914f60f4e926b3da53d8ffd38386fea520cee363fc5c",
+      "size": 6096
+    },
+    {
+      "path": "referencias/comunicacao.md",
+      "sha256": "a83f6472f5613938bbd5d2884c0a332f8bdd5acef2996401eef8de4b9f79b2d5",
+      "size": 1708
+    },
+    {
+      "path": "referencias/contratos.md",
+      "sha256": "6e25dfee3e5f110213cc2211b8c145685b7cbca5224efabb296982d329f87ff9",
+      "size": 9682
+    },
+    {
+      "path": "referencias/evolucao.md",
+      "sha256": "918bc3f10a02bcdc49262d53c875662e404e55b6c67cc98d79f89b82d648d1e5",
+      "size": 7333
+    },
+    {
+      "path": "referencias/harness.md",
+      "sha256": "3d959221a26fa458da38c9f351c94fcd37525763401c86fc93c6611e4ebd560f",
+      "size": 10232
+    },
+    {
+      "path": "referencias/modelos.md",
+      "sha256": "b2e88c1ea9101db5c095a74b85a9f8881834dd51682550946330d923e866306b",
+      "size": 2918
+    },
+    {
+      "path": "referencias/retomada.md",
+      "sha256": "2363cfe811472da28892b9150cc3b74d80537504e7efe0faca1d80c3a39e84e5",
+      "size": 4287
+    },
+    {
+      "path": "referencias/revisao.md",
+      "sha256": "c3f1ce89d41951f94f6e6dbad64ef8496bfd2c1aaca49d36c9ca736789884b4d",
+      "size": 7205
+    },
+    {
+      "path": "referencias/terreno.md",
+      "sha256": "f5cd6fca59d2c81a904c900fe22ae8ffe143d8a0175a6889d7ebae7cb74ebb54",
+      "size": 7581
+    },
+    {
+      "path": "referencias/triagem.md",
+      "sha256": "7bd935ed96f214fc2ea1cbafeaff2ab68c885432cdbebc9536dd13bb9de70f89",
+      "size": 7408
+    },
+    {
+      "path": "scripts/adaptadores.py",
+      "sha256": "2b0a50cef9c044736ea389866e85149564025be200d1436a276b60234c7b8045",
+      "size": 17988
+    },
+    {
+      "path": "scripts/aprendizado.py",
+      "sha256": "d7a6996bf251487ed1f74c8fcb927caf1975f459a42851e36248a71547144e52",
+      "size": 34152
+    },
+    {
+      "path": "scripts/avaliar.py",
+      "sha256": "adcab930e9a025bdd71e06dcd95d69c0c8f2816ed9ee80edecd8c9e8cb78aa45",
+      "size": 5082
+    },
+    {
+      "path": "scripts/base-tarefa.sh",
+      "sha256": "6f807ed6a24c52f99f930f739b9500d60b84be8953f36c23402a066f6972c682",
+      "size": 450
+    },
+    {
+      "path": "scripts/diff-tarefa.sh",
+      "sha256": "0e9c304387c7148affabe406033e55c46892d7da87376d3871c8ebfe058a7cf8",
+      "size": 1823
+    },
+    {
+      "path": "scripts/estado_tarefa.py",
+      "sha256": "1281f9a4b49395bfc13813a5af8c5d521e5a36c93d77b56fc467c258a67727d2",
+      "size": 30401
+    },
+    {
+      "path": "scripts/extrair-insight.sh",
+      "sha256": "2cb13a7eca3c6ae706e8237f85bb82c9a5f64d075a411fffb2af356555b3c3a1",
+      "size": 227
+    },
+    {
+      "path": "scripts/monitor.py",
+      "sha256": "311029e474ec699dcf8eb1a25e370f1530be2a147273df73e34acc283caa7ff3",
+      "size": 22129
+    },
+    {
+      "path": "scripts/nova-tarefa.sh",
+      "sha256": "b56ac57e069a0014ab97a1f20a2b21443df09f13779a1048d9e73b5798c36238",
+      "size": 3612
+    },
+    {
+      "path": "scripts/progresso.sh",
+      "sha256": "78dc9e46b3ce3744a4871328e50c29bb902beb29ba3f617b997cc57818f61202",
+      "size": 2754
+    },
+    {
+      "path": "scripts/testar.sh",
+      "sha256": "e7492ae83d5e362e8fe62eef1be22a3b6e29ca88a181255d49ad92cb14d4f160",
+      "size": 482
+    },
+    {
+      "path": "testes/casos.md",
+      "sha256": "d7e8adfdb3e1bb53a65ef59d76f9111949e3b0ac08b99557768664e93f0eeab8",
+      "size": 41134
+    },
+    {
+      "path": "testes/fixtures/harness-statusline-legado.txt",
+      "sha256": "cbefbd472e9139bb9f0c59e1d1a64e63d4aaf2f60e0e40aae21c4e1816c9f65a",
+      "size": 22439
+    },
+    {
+      "path": "testes/scripts/teste-diff-tarefa.sh",
+      "sha256": "5ae466e89641681904610a4145209f3168c3ee7e34d14883205d4116d0559b01",
+      "size": 3739
+    },
+    {
+      "path": "testes/scripts/teste-orcamento.sh",
+      "sha256": "d632d0ac7b155ef4e5bf8606b7caaa04a64b0ef4c8ddf39f6565502d58a3a041",
+      "size": 25177
+    },
+    {
+      "path": "testes/scripts/teste-progresso.sh",
+      "sha256": "3d64adefa2bbd3481c5774b61d0f5df376ad100123fc471da8ac77cd188342e2",
+      "size": 17043
+    },
+    {
+      "path": "testes/test_adaptadores.py",
+      "sha256": "55110a56bda134ea80bf534cf882729b78f28fa35e91bc4d49f1a86ef1707ce8",
+      "size": 12730
+    },
+    {
+      "path": "testes/test_aprendizado.py",
+      "sha256": "f51b31ca3eabee3bf06b26f434594f7dbbd9a113c7465069226c46e4beb6f36a",
+      "size": 23062
+    },
+    {
+      "path": "testes/test_avaliar.py",
+      "sha256": "39152faee3d3b9aa17bc290d5bd6ad8b197b64f71ebfd210e7eb92df994ee588",
+      "size": 2554
+    },
+    {
+      "path": "testes/test_estado_tarefa.py",
+      "sha256": "4718e8f095e8f151e87b80a76fec43206b19f99d4514e37b47fd4210ac1fbcf6",
+      "size": 23769
+    },
+    {
+      "path": "testes/test_monitor.py",
+      "sha256": "308a51c9ea8aedd8801a1225495d4ff686dcca606a8d0d26c2dba3874f5e8311",
+      "size": 11676
+    }
+  ],
+  "excluded_from_digest": [
+    "RELATORIO_PARA_REVISAO_CLAUDE_CODE.md",
+    "docs/validacao/estado-final.json"
+  ],
+  "reason": "evitar autorreferência; relatório e manifesto acompanham o patch"
+}

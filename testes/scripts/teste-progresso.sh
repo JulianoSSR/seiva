@@ -75,11 +75,11 @@ printf '# Perfil\nL1 regra\n' >"$W/perfil.md"
 mkdir -p "$P/relatorios"
 printf 'MAPA:\n- a.js:10 — rota\n' >"$P/relatorios/batedor-1.md"
 printf '# Plano\nT1 mexe em a.js\n' >>"$P/plano.md"
-roda "$P" marcar 0 feita "$W/perfil.md"
+roda "$P" marcar 0 feita "$W/perfil.md" --allow-root "$W" --evidence "fixture: inspeção mecânica dos artefatos"
 eq "marcar 0 feita" 0 "$RC"
-roda "$P" marcar 1 feita registro.md
-roda "$P" marcar 2 feita relatorios/batedor-1.md
-roda "$P" marcar 3 "feita: plano aprovado pelo construtor" plano.md
+roda "$P" marcar 1 feita registro.md --evidence "fixture: inspeção mecânica dos artefatos"
+roda "$P" marcar 2 feita relatorios/batedor-1.md --evidence "fixture: inspeção mecânica dos artefatos"
+roda "$P" marcar 3 "feita: plano aprovado pelo construtor" plano.md --evidence "fixture: inspeção mecânica dos artefatos"
 roda "$P" marcar 4 "em-curso: rodada 1/2 · leva adversario, seguranca"
 eq "marcar 4 em curso" 0 "$RC"
 tem "a nota fica na linha" "$(grep -E '^\| 4 ' "$P/progresso.md")" "rodada 1/2"
@@ -127,7 +127,7 @@ printf 'mudança de outra sessão\n' >>"$P/plano.md"
 roda "$P" conferir
 eq "artefato mexido: código 1" 1 "$RC"
 tem "artefato mexido: diz para olhar, não refazer" "$SAI" "plano.md MUDOU depois de feita (olhe o artefato; não refaça a etapa)"
-tem "artefato mexido: a próxima continua a 4" "$SAI" "PROXIMA 4 Atacar o plano"
+tem "artefato mexido: revalidar somente a etapa afetada" "$SAI" "PROXIMA 3 Propor"
 rm "$P/relatorios/batedor-1.md"
 roda "$P" conferir
 tem "artefato apagado: SUMIU" "$SAI" "relatorios/batedor-1.md SUMIU"
@@ -139,14 +139,14 @@ tem "contexto acima do alvo é avisado" "$SAI" "ACIMA do alvo"
 
 # --- tarefas por terminar ----------------------------------------------------------
 roda "$W" pendentes
-tem "pendentes lista a tarefa" "$SAI" "queda-n2 · 4 Atacar o plano"
-roda "$P" marcar 9 feita
+tem "pendentes lista etapa com artefato ausente para revalidação" "$SAI" "queda-n2 · 2 Reconhecer"
+roda "$P" marcar 9 feita registro.md --evidence "fixture: entrega conferida"
 roda "$W" pendentes
 tem "tarefa com a etapa 9 feita sai da lista" "$SAI" "nenhuma tarefa por terminar"
 roda "$P" marcar 9 "pulada: tarefa cancelada pelo usuário"
 roda "$W" pendentes
 tem "tarefa com a etapa 9 pulada também sai da lista, como no conferir" "$SAI" "nenhuma tarefa por terminar"
-roda "$P" marcar 9 feita
+roda "$P" marcar 9 feita registro.md --evidence "fixture: entrega conferida"
 
 # --- tarefa de antes do progresso.md -----------------------------------------------
 V=$W/tarefas/2026-01-01-velha

@@ -1,71 +1,63 @@
 # Seiva
 
-Skill para agentes de programação que organiza o trabalho complexo num enxame de subagentes, cada um com o modelo mais barato que dá conta da sua parte. Um agente propõe o plano, outros o atacam antes da primeira linha de código, e a entrega só sai com prova.
+<img src="assets/identidade/seiva-simbolo-escuro.svg" alt="Símbolo original da Seiva" width="96">
 
-O nome vem da analogia: a seiva sobe pela árvore e toma a forma dela. A skill não traz regra de domínio nem estrutura pronta. Ela lê as regras do projeto em que está (`CLAUDE.md`, `AGENTS.md`, constituição, `CONTRIBUTING`) e se molda a elas.
+**A Seiva organiza trabalho de programação pelo risco e entrega com prova.** O objetivo é gastar menos **tokens no total** sem perder qualidade: comando para trabalho mecânico, contexto suficiente para decidir, revisão por outra instância e retomada sem repetir etapas válidas.
 
-## O que ela faz
+A seiva toma a forma do projeto. Lê suas regras, identifica as capacidades do ambiente e escolhe só os papéis necessários. O núcleo funciona sem depender de um aplicativo; integrações entram sob demanda.
 
-- **Mede o risco antes de gastar.** Classifica a tarefa em quatro níveis. Correção trivial ela manda fazer direto. Permissão, dinheiro, migração, isolamento entre clientes e produção recebem o processo completo.
-- **Escolhe o modelo por tarefa.** Busca e leitura vão para o modelo rápido; implementação bem descrita, para o médio; plano e revisão de alto risco, para o mais forte. O que é mecânico vira comando, sem modelo.
-- **Ataca o plano antes do código.** Um adversário faz o pre-mortem ("isto já quebrou; por quê?"), e as lentes (segurança, dados, design, desempenho, operação, contrato) respondem às perguntas da área delas. Achado só conta com prova. Os revisores leem fichas e trechos do código gerados por script, não arquivos inteiros.
-- **Julga os achados e para na hora certa.** Um script numera e agrupa os achados, e o orquestrador confere cada um, agrupa por causa e decide a rota: pergunta ao usuário, revisão do plano, ajuste ou registro. Até duas rodadas por portão em risco médio e três em risco alto.
-- **Verifica com outro agente.** Quem implementa não é quem prova. O verificador roda os comandos do projeto e confere cada critério de aceite e cada risco do plano.
-- **Aprende com o que escapa.** Defeito encontrado depois da entrega vira proposta de pergunta nova numa lente. Nada muda sem aprovação.
-- **Vigia a janela de uso e o contexto (Claude Code, no terminal e no app desktop).** Antes de cada leva de agentes, lê os transcripts locais e estima o uso da janela de 5 horas e o tamanho do contexto da sessão. Perto do limite, segura as tarefas grandes e para limpo, com o ponto de retomada gravado, em vez de estourar no meio. A estimativa se calibra sozinha pelas vezes em que a conta bateu no limite; é freio, não medidor oficial.
-- **Retoma sem pagar de novo.** O estado da tarefa fica em dois arquivos curtos. Uma sessão nova retoma lendo perto de mil tokens e não refaz etapa feita.
+## Como trabalha
 
-## O que ela não faz
+- N0 faz direto. N1 recebe verificação e revisão curta. N2 e N3 passam por plano, revisão, implementação e prova proporcionais ao risco.
+- O modelo é escolhido pela capacidade necessária e pelo consumo total observado. Menor preço por token não significa menos tokens nem menor custo ao terminar.
+- Fichas, diff e trechos são o ponto de partida. Revisores podem rastrear dependentes, descobrir caminhos fora do mapa do batedor e ler arquivos inteiros quando necessário, registrando o motivo em uma frase.
+- Quem constrói não aprova o próprio trabalho. Cada revisão informa a independência que teve de fato.
+- Um achado grave confirmado só fecha com correção verificada ou aceite explícito do responsável, quando as regras permitirem. O teto de rodadas interrompe o trabalho; ele não aprova uma pendência.
+- O estado da tarefa fica em arquivos privados de execução. Uma sessão nova confere tentativa, hash e evidência antes de aproveitar um resultado.
 
-- Não instala hook, agente nem regra carregada em toda sessão, e nada no repositório do projeto. O custo fixo é só a descrição da skill. A exceção é fora do Claude Code: Codex, Gemini, Cursor e OpenCode só escolhem modelo por subagente através de arquivo de agente, então a seiva cria quatro agentes genéricos (um por categoria) no diretório do usuário, depois de perguntar.
-- Não substitui as regras do projeto. Quando as duas divergem, vale a do projeto.
-- Não commita nem sobe nada se o projeto não permitir.
-- Não diz que a revisão foi independente quando não foi.
-- O orçamento vivo não precisa de statusline nem de hook. A statusline continua opcional, quem instala é você, e ela só roda no `claude` de terminal: quando está lá, o número oficial dela substitui a estimativa.
+Resina é o hacker defensivo: acompanha entrada, validação, autorização e destino sensível, procura caminhos de abuso e propõe conserto. Provas executáveis exigem ambiente isolado, dados sintéticos e autorização; outro agente julga a evidência.
 
-## Instalação
+## Instalação e uso
 
-**Claude Code, como skill pessoal:**
+Como skill pessoal do Claude Code:
 
 ```bash
 git clone https://github.com/JulianoSSR/seiva.git ~/.claude/skills/seiva
 ```
 
-Para atualizar, rode `git pull` dentro da pasta. A skill aparece na sessão seguinte.
-
-**Claude Code, como plugin:**
+Como plugin do Claude Code:
 
 ```text
 /plugin marketplace add JulianoSSR/seiva
 /plugin install seiva@seiva
 ```
 
-**Codex CLI, Cursor e outros:** copie a pasta `seiva/` para o diretório de skills da ferramenta. Para ter um modelo por categoria no Codex, veja [referencias/harness.md](referencias/harness.md).
+Nas outras ferramentas, use o diretório de skills documentado pelo próprio ambiente. Antes de escolher modelos, paralelismo ou isolamento, confira as capacidades disponíveis. A seiva não instala agentes, hooks ou configuração global persistente. Veja [integrações](referencias/harness.md).
 
-## Como usar
-
-Peça em linguagem comum ("usa a seiva para corrigir o BUG-088", "planeja e revisa esta migração") ou chame pelo nome:
+Peça “usa a seiva para corrigir este bug” ou:
 
 ```text
 /seiva <o que precisa ser feito>
 ```
 
-Na primeira vez num projeto, a seiva monta um perfil com as regras que encontrou e pede a sua confirmação. Depois ela só relê o que mudou.
+O perfil inicial reúne as regras do projeto para conferência. Autorizações já dadas continuam valendo.
 
-## Custo
+## Medição e limites
 
-Um enxame gasta muito mais tokens que uma conversa: a Anthropic mediu cerca de 15 vezes. Por isso a seiva começa pela triagem. Tarefa trivial não dispara agente; tarefa leve usa de 1 a 3; só as de risco alto recebem o processo inteiro. O orçamento de agentes de cada tarefa aparece antes de começar, e os tokens gastos, dos subagentes e da sessão principal, ficam anotados contra esse orçamento. Em risco médio, plano e revisão usam o modelo médio, e o código é revisado uma vez, pelo adversário, a não ser que apareça superfície nova.
+Notificação de agente é um aviso de término, não uma contabilidade completa. A medição distingue tokens de entrada, saída e cache, atribuição à tarefa, estimativas e campos indisponíveis. O intervalo de uma tarefa pode atravessar sessões, e uma sessão pode atender várias tarefas.
 
-Se a conta não tiver acesso ao modelo mais caro, a seiva desce para o de baixo, segue e diz isso na entrega.
+Os scripts legados de orçamento do Claude Code continuam disponíveis como integração específica. Percentual estimado de uso, tokens e dinheiro são grandezas diferentes. Sem fonte ou capacidade detectada, a seiva declara a lacuna; não inventa zero nem rebaixa trabalho sensível para caber.
 
-## Como contribuir
+[Modelos e custo](referencias/modelos.md) · [Fluxo completo](SKILL.md) · [Avaliações reproduzíveis](docs/AVALIACOES.md)
 
-Toda proposta precisa de um caso real que ela melhora e de um caso de teste novo em [testes/casos.md](testes/casos.md). O passo a passo está no [CONTRIBUTING.md](CONTRIBUTING.md).
+## Privacidade e contribuição
 
-## Origem
+Pacotes, relatórios de execução, transcripts e aprendizado local ficam em pasta ignorada pelo git. Documentação, casos sintéticos e avaliações sanitizadas podem ser versionados. `julianossr.md` existente é preservado; nada dele vira exemplo público automaticamente.
 
-A primeira versão saiu de um levantamento feito em 2026-09-26 em onze projetos públicos de orquestração de agentes, entre eles o ECC, o Superpowers, o Spec-Kit, o BMAD e o GSD, e em estudos sobre viés de modelos usados como revisores. O texto foi escrito do zero, em português. O que veio de onde está no [FONTES.md](FONTES.md).
+Propostas precisam de caso real, custo esperado e caso de teste. Veja [CONTRIBUTING.md](CONTRIBUTING.md), [testes/casos.md](testes/casos.md) e [fontes](FONTES.md).
 
-## Licença
+MIT · [LICENSE](LICENSE).
 
-MIT. Veja [LICENSE](LICENSE).
+## Comunicação e propostas de melhoria
+
+Respostas destacam a conclusão primeiro e usam linguagem simples, tabelas e visuais adequados, sem aumentar pacotes internos. O [aprendizado local](referencias/aprendizado.md) propõe melhorias conceituais com fichas pequenas, sem conteúdo do projeto. Envio só após revisão e autorização da ficha exata; GitHub autenticado não é anônimo. Recepção e triagem não executam contribuições nem habilitam merge automático.
