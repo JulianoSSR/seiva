@@ -69,7 +69,9 @@ Para recusar, use `--decisao recusar`. O agente não registra autorização nem 
 
 Mudanças nos bytes da ficha, título, corpo, canal ou destino exigem nova confirmação. Nova revisão troca seu ID e invalida a confirmação anterior. A autorização vale para aquela ficha e apresentação.
 
-O transporte usa GitHub CLI já instalada e autenticada pelo usuário, com permissão mínima de abrir issue no destino. Não cria/distribui credencial do mantenedor. O host é fixo; `GH_HOST` não pode trocar o destino. Busca duplicatas e grava envio em curso antes da primeira rede. Erro ou queda torna o envio incerto, preserva a ficha e bloqueia retry automático. `conciliar --issue <numero>` só consulta o destino fixo e compara o corpo aprovado.
+O transporte usa GitHub CLI já instalada e autenticada pelo usuário, com permissão mínima de abrir issue no destino. Não cria/distribui credencial do mantenedor. O host é fixo; `GH_HOST` não pode trocar o destino. Busca duplicatas e grava envio em curso antes da primeira rede. Erro antes do pedido de criação não publica nada: a ficha volta a `local`, a autorização caduca e é preciso preparar e autorizar de novo. Erro ou queda durante a criação torna o envio incerto, preserva a ficha e bloqueia retry automático. `conciliar --issue <numero>` só consulta o destino fixo e compara o corpo aprovado; se a conferência manual no GitHub mostrar que a issue não existe, `conciliar-ausente --confirmo-que-nao-existe` devolve a ficha a `local`.
+
+Mesma categoria conta como a mesma ficha. A exceção é a ficha já enviada quando a versão da Seiva muda: a versão nova pode avisar que o problema continua. Recusa vale em qualquer versão.
 
 Sem CLI ou permissão de envio, copie título e corpo exatos apresentados, depois do consentimento, para publicação manual. Esta versão não importa automaticamente o resultado manual; registre a decisão e confira duplicatas antes de envio posterior. Nenhum commit/push no cliente é necessário para contribuir.
 

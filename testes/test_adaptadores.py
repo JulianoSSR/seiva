@@ -14,6 +14,11 @@ a = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(a)
 
 class NormalizeTests(unittest.TestCase):
+    def test_claude_synthetic_message_ignored(self):
+        record = {'type': 'assistant', 'sessionId': 's1', 'timestamp': '2026-11-09T10:00:00Z',
+                  'message': {'id': 'msg_1', 'model': '<synthetic>', 'usage': {'input_tokens': 0, 'output_tokens': 0}}}
+        self.assertEqual([], a.normalize('claude', record))
+
     def test_codex_jsonl(self):
         event, = a.normalize('codex', {'timestamp': '2026-01-01T00:00:00Z', 'type': 'event_msg',
             'payload': {'type': 'token_count', 'session_id': 's1', 'info': {

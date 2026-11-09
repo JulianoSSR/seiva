@@ -105,6 +105,29 @@ roda "$W" z
 eq "N-b · a mesma tarefa de novo: código 1, como hoje" 1 "$RC"
 tem "N-b · a mesma tarefa de novo: diz que já existe" "$ERR" "já existe"
 
+# Tarefa nova não nasce marcada como migrada, e o progresso.md vem do estado.json.
+R="$T/repo-limpo"; git init -q "$R"; printf '.seiva/\n' >"$R/.gitignore"
+NT=$(cd "$R" && bash "$NOVA" .seiva limpa 2>/dev/null)
+eq "N-c · tarefa nova: sem migrated_from" None "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("migrated_from"))' "$R/$NT/estado.json")"
+tem "N-c · tarefa nova: progresso.md derivado do estado" "$(cat "$R/$NT/progresso.md")" "Derivado de estado.json"
+
+# Submódulo: a base registra o gitlink e a tarefa é criada.
+L="$T/lib"; git init -q "$L"; echo x >"$L/x"
+git -C "$L" add x; git -C "$L" -c user.email=t@t -c user.name=t commit -qm x
+S="$T/com-sub"; git init -q "$S"; printf '.seiva/\n' >"$S/.gitignore"
+git -C "$S" -c protocol.file.allow=always submodule add -q "$L" lib 2>/dev/null
+SAI=$(cd "$S" && bash "$NOVA" .seiva sub 2>"$T/err"); RC=$?
+eq "N-d · repositório com submódulo: código 0" 0 "$RC"
+eq "N-d · repositório com submódulo: base capturada" sim "$([ -f "$S/$SAI/estado.json" ] && echo sim)"
+
+# Init que falha (arquivo rastreado virou diretório) não deixa pasta pela metade.
+F="$T/falha"; git init -q "$F"; printf '.seiva/\n' >"$F/.gitignore"; echo a >"$F/arq"
+git -C "$F" add arq .gitignore; rm "$F/arq"; mkdir "$F/arq"
+SAI=$(cd "$F" && bash "$NOVA" .seiva quebra 2>"$T/err"); RC=$?
+eq "N-e · init que falha: código 2" 2 "$RC"
+eq "N-e · init que falha: nenhuma pasta de tarefa sobra" 0 "$(find "$F/.seiva/tarefas" -mindepth 1 -maxdepth 1 | wc -l)"
+tem "N-e · init que falha: diz que nada ficou criado" "$(cat "$T/err")" "nada ficou criado"
+
 if [ "$erros" -ne 0 ]; then
   echo "FALHA: $erros de $n casos"
   exit 1

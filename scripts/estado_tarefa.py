@@ -110,6 +110,10 @@ def empty(task):
 def artifact_path(task, name, extra_roots=()):
     candidate = Path(name) if Path(name).is_absolute() else task / name
     roots = [task.resolve()]
+    own_repo = repo_at(task)
+    if own_repo:
+        # Tarefa legada não tem repository gravado; o perfil da pasta de trabalho continua alcançável.
+        roots.append(own_repo)
     state_path = task / "estado.json"
     if state_path.is_file():
         state = json.loads(state_path.read_text())
@@ -140,7 +144,7 @@ def readstate(task, create=False):
                     raise ValueError("status")
                 for field in ("artifacts", "dependencies"):
                     for name, value in stage.get(field, {}).items():
-                        if not isinstance(name, str) or not re.fullmatch(r"[0-9a-f]{12}|[0-9a-f]{64}", value["sha256"]):
+                        if not isinstance(name, str) or not re.fullmatch(r"[0-9a-f]{12,64}", value["sha256"]):
                             raise ValueError("hash de artefato")
             if not isinstance(state.get("attempts"), dict) or not isinstance(state.get("claims"), dict):
                 raise ValueError("tentativas/escopos")
@@ -179,6 +183,8 @@ def readstate(task, create=False):
         raise Invalid("progresso.md legado incompleto: esperadas dez etapas únicas; nenhuma conclusão inferida")
     state["stages"] = rows
     state["migrated_from"] = "progresso.md"
+    repo = repo_at(task)
+    state["repository"] = str(repo) if repo else None
     return state
 
 def markdown(state):
@@ -193,6 +199,11 @@ def markdown(state):
 
 def save(task, state):
     state["updated_at"] = now()
+    legacy = task / "progresso.md"
+    backup = task / "progresso.legado.md"
+    if state.get("migrated_from") and not (task / "estado.json").exists() and legacy.is_file() and not backup.exists():
+        # A primeira gravação de tarefa migrada guarda o arquivo original inteiro.
+        atomic(backup, legacy.read_bytes())
     # JSON é a única autoridade. Falha no derivado não pode desfazer o estado confirmado.
     jsonwrite(task / "estado.json", state)
     atomic(task / "progresso.md", markdown(state))
@@ -207,6 +218,11 @@ def init(task, repo=None):
         if repo:
             names = set(filter(None, git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard").stdout.split(b"\0")))
             head = git(repo, "rev-parse", "--verify", "HEAD", allowed=(0, 128))
+            gitlinks = set()
+            for entry in git(repo, "ls-files", "-s", "-z").stdout.split(b"\0"):
+                meta, _, name = entry.partition(b"\t")
+                if meta.startswith(b"160000 "):
+                    gitlinks.add(os.fsdecode(name))
             if head.returncode == 0:
                 names.update(filter(None, git(repo, "ls-tree", "-rz", "--name-only", "HEAD").stdout.split(b"\0")))
             files = {}
@@ -215,6 +231,10 @@ def init(task, repo=None):
                 # Metadados da tarefa não fazem parte da base do produto.
                 p = repo / rel
                 if p == task or task in p.parents:
+                    continue
+                if rel in gitlinks:
+                    # Submódulo: registrado pelo commit, nunca entra em escopo de arquivo.
+                    files[rel] = {"exists": True, "mode": "160000", "sha256": None, "gitlink": True}
                     continue
                 files[rel] = fingerprint(p)
             state["repository"] = str(repo)
@@ -355,6 +375,8 @@ def mark(task, number, status, names, deps=(), attempt=None, evidence="", allow_
     if number not in map(str, range(10)) or status.split(":", 1)[0] not in STATUSES or "\n" in status:
         raise Invalid("uso: progresso.sh <pasta-da-tarefa> marcar <0-9> <pendente|em-curso|feita|pulada> [artefato...]")
     status = status.replace("|", "/")
+    if status.split(":", 1)[0] == "pulada" and not status.partition(":")[2].strip():
+        raise Invalid("etapa pulada exige motivo: marcar N 'pulada: motivo'")
     done = status.split(":", 1)[0] == "feita"
     arts = {name: artifact(task, name, allow_roots) for name in names} if done else {}
     if done and (not arts or (not attempt and not evidence.strip())):
@@ -379,14 +401,36 @@ def mark(task, number, status, names, deps=(), attempt=None, evidence="", allow_
         print("etapa " + number + ": " + status + (" · " + suffix if suffix else ""))
 
 def changed(task, name, value):
-    path = artifact_path(task, name)
+    try:
+        path = artifact_path(task, name)
+    except Invalid:
+        return "FORA-DO-ESCOPO"
     if not path.is_file() or path.is_symlink():
         return "SUMIU"
     return None if digest(path.read_bytes()).startswith(value["sha256"]) else "MUDOU"
 
+def skip_reason(stage):
+    return stage["status"].partition(":")[2].strip()
+
+def legacy_unproven(stage):
+    """Etapa vinda do progresso.md antigo, sem prova: pede revalidação, mas não é o ponto de retomada."""
+    kind = stage["status"].split(":", 1)[0]
+    if kind == "pulada":
+        return not skip_reason(stage) and not stage.get("proof")
+    return (kind == "feita" and not stage.get("proof") and bool(stage["artifacts"])
+            and all(v.get("legacy") for v in stage["artifacts"].values()))
+
+def resume_point(task, state):
+    """Primeira etapa inválida, ignorando o legado sem prova (listado à parte)."""
+    for n in range(10):
+        s = state["stages"][str(n)]
+        if not stage_valid(task, state, s) and not legacy_unproven(s):
+            return str(n) + " " + s["name"] + " · " + s["status"]
+    return None
+
 def stage_valid(task, state, stage):
     if stage["status"].split(":", 1)[0] == "pulada":
-        return True
+        return bool(skip_reason(stage))
     if stage["status"].split(":", 1)[0] != "feita" or not stage["artifacts"]:
         return False
     proof = stage.get("proof") or {}
@@ -408,9 +452,9 @@ def check(task):
     task = validate_task(task)
     with lock(task / ".estado.lock"):
         state = readstate(task)
-        # Conferir não altera a data de progresso. Migração preserva os hashes gravados.
+        # Conferir não altera a data de progresso. Tarefa legada é só lida: nada é gravado aqui.
         if not (task / "estado.json").exists():
-            save(task, state)
+            print("LEGADO · progresso.md antigo lido sem alteração; a 1ª marcação cria estado.json e guarda progresso.legado.md")
         elif not (task / "progresso.md").exists() or (task / "progresso.md").read_text() != markdown(state):
             atomic(task / "progresso.md", markdown(state))
         failures, nextstage = 0, None
@@ -423,14 +467,19 @@ def check(task):
             status = s["status"].split(":", 1)[0]
             stale = [name for name, value in s.get("dependencies", {}).items() if changed(task, name, value)]
             valid = stage_valid(task, state, s)
-            if nextstage is None and not valid:
+            legacy = legacy_unproven(s)
+            if nextstage is None and not valid and not legacy:
                 nextstage = str(n) + " " + s["name"]
             if status == "pendente":
                 continue
             notes = ""
             if status == "feita" and not valid:
                 failures += 1
-                notes += " · NAO-COMPROVADA (revalide evidência ou tentativa vinculada)"
+                notes += (" · LEGADO SEM PROVA (revalide antes de fechar; não refaça a etapa)" if legacy
+                          else " · NAO-COMPROVADA (revalide evidência ou tentativa vinculada)")
+            if status == "pulada" and not valid:
+                failures += 1
+                notes += " · PULADA SEM MOTIVO (registre o motivo)"
             if stale:
                 failures += 1
                 notes += " · DEPENDENCIA MUDOU: " + ", ".join(stale)
@@ -465,12 +514,17 @@ def pending(work):
             if (task / "registro.md").exists():
                 found.append((task.stat().st_mtime, task, "legada · retome pelo registro.md"))
             continue
-        state = readstate(task)
+        try:
+            state = readstate(task)
+        except Invalid as e:
+            found.append((task.stat().st_mtime, task, "INVALIDA · " + str(e)))
+            continue
         if stage_valid(task, state, state["stages"]["9"]):
             continue
-        stage = next((str(n) + " " + s["name"] + " · " + s["status"]
-                      for n in range(10) for s in [state["stages"][str(n)]]
-                      if not stage_valid(task, state, s)), "sem etapa")
+        stage = resume_point(task, state) or "sem etapa pendente"
+        unproven = [str(n) for n in range(10) if legacy_unproven(state["stages"][str(n)])]
+        if unproven:
+            stage += " · legado sem prova: " + ",".join(unproven)
         stamp = (task / ("estado.json" if (task / "estado.json").exists() else "progresso.md")).stat().st_mtime
         found.append((stamp, task, stage))
     for stamp, task, stage in sorted(found, key=lambda x: (-x[0], str(x[1])))[:5]:

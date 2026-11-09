@@ -60,7 +60,7 @@ mkdir "$destino" || { echo "já existe ou não pode criar: $destino" >&2; exit 1
 mkdir "$destino/relatorios"
 sed -e "s/{{DATA}}/$dia/g" -e "s/{{SLUG}}/$slug/g" "$skill/moldes/registro.md" > "$destino/registro.md"
 sed -e "s/{{SLUG}}/$slug/g" "$skill/moldes/plano.md" > "$destino/plano.md"
-sed -e "s/{{SLUG}}/$dia-$slug/g" "$skill/moldes/progresso.md" > "$destino/progresso.md"
+# progresso.md nasce do estado.json no init; copiar o molde antes faria a tarefa nova parecer migrada.
 sed -e "s/{{SLUG}}/$dia-$slug/g" "$skill/moldes/contexto-tarefa.md" > "$destino/contexto-tarefa.md"
 printf '# Achados — %s\n' "$slug" > "$destino/achados.md"
 
@@ -80,5 +80,10 @@ sid=${sid//[^A-Za-z0-9._-]/}
 } >> "$destino/registro.md"
 
 # A base contém os bytes atuais, inclusive alterações anteriores; nenhuma edição de produto ocorre aqui.
-python3 "$skill/scripts/estado_tarefa.py" init "$destino"
+if ! python3 "$skill/scripts/estado_tarefa.py" init "$destino"; then
+  # A pasta foi criada nesta execução (o mkdir acima recusa pasta existente): sem base, ela não serve.
+  rm -rf -- "$destino"
+  echo "nova-tarefa.sh: base não capturada; nada ficou criado em $destino" >&2
+  exit 2
+fi
 echo "$destino"

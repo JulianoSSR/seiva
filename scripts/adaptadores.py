@@ -182,6 +182,9 @@ def _claude(record):
     message = _obj(record.get('message'))
     if message.get('usage') is None:
         return []
+    if message.get('model') == '<synthetic>':
+        # Mensagem gerada pelo próprio Claude Code (erro, interrupção): não houve chamada de modelo.
+        return []
     names = dict(zip(_KEYS, ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')))
     message_id = _label(message.get('id'))
     request_id = _label(record.get('requestId', record.get('request_id')))

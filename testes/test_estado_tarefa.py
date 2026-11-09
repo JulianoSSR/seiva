@@ -218,8 +218,81 @@ class StateTests(unittest.TestCase):
         state["stages"]["0"].update(status="feita", artifacts={"a": {"sha256": fp}})
         (self.task / "progresso.md").write_text(m.markdown(state))
         (self.task / "a").write_text("changed")
+        legacy = (self.task / "progresso.md").read_bytes()
         self.assertEqual(1, self.quiet(m.check, self.task))
+        # Conferir só lê tarefa legada: nada gravado, arquivo original intacto.
+        self.assertFalse((self.task / "estado.json").exists())
+        self.assertEqual(legacy, (self.task / "progresso.md").read_bytes())
+        self.proved_mark(self.task, "1", "feita", [])
         self.assertEqual(fp, self.state()["stages"]["0"]["artifacts"]["a"]["sha256"])
+        self.assertEqual(legacy, (self.task / "progresso.legado.md").read_bytes())
+
+    def legacy_project(self):
+        proj = self.root / "proj"
+        subprocess.run(["git", "init", "-q", str(proj)], check=True)
+        (proj / ".gitignore").write_text(".claude/\n")
+        work = proj / ".claude/seiva"
+        task = work / "tarefas/antiga"
+        task.mkdir(parents=True)
+        (work / "perfil.md").write_text("perfil\n")
+        (task / "registro.md").write_text("registro\n")
+        state = m.empty(task)
+        for n in range(6):
+            name = "../../perfil.md" if n == 0 else "registro.md"
+            data = (work / "perfil.md") if n == 0 else (task / "registro.md")
+            state["stages"][str(n)].update(status="feita", artifacts={name: {"sha256": m.digest(data.read_bytes())[:12]}})
+        state["stages"]["6"]["status"] = "em-curso: adendo parcial"
+        (task / "progresso.md").write_text(m.markdown(state))
+        return work, task
+
+    def test_legacy_shared_profile_resumes_at_real_stage(self):
+        work, task = self.legacy_project()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(1, m.check(task))
+        self.assertIn("../../perfil.md confere", out.getvalue())
+        self.assertIn("LEGADO SEM PROVA", out.getvalue())
+        self.assertIn("PROXIMA 6 Construir", out.getvalue())
+        self.assertFalse((task / "estado.json").exists())
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.pending(work)
+        self.assertIn("6 Construir · em-curso: adendo parcial", out.getvalue())
+        self.assertIn("legado sem prova: 0,1,2,3,4,5", out.getvalue())
+
+    def test_pending_survives_one_invalid_task(self):
+        work, task = self.legacy_project()
+        bad = work / "tarefas/quebrada"
+        bad.mkdir()
+        (bad / "estado.json").write_text("{")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.pending(work)
+        self.assertIn("INVALIDA", out.getvalue())
+        self.assertIn("6 Construir", out.getvalue())
+
+    def test_skipped_stage_requires_reason(self):
+        with self.assertRaisesRegex(m.Invalid, "exige motivo"):
+            self.quiet(m.mark, self.task, "9", "pulada", [])
+        with self.assertRaisesRegex(m.Invalid, "exige motivo"):
+            self.quiet(m.mark, self.task, "7", "pulada:  ", [])
+        self.quiet(m.mark, self.task, "9", "pulada: cancelada pelo usuário", [])
+        self.assertEqual("pulada: cancelada pelo usuário", self.state()["stages"]["9"]["status"])
+
+    def test_submodule_recorded_as_gitlink(self):
+        lib = self.root / "lib"
+        subprocess.run(["git", "init", "-q", str(lib)], check=True)
+        (lib / "x").write_text("x")
+        g = ["-c", "user.email=t@t", "-c", "user.name=t"]
+        subprocess.run(["git", "-C", str(lib), *g, "add", "x"], check=True)
+        subprocess.run(["git", "-C", str(lib), *g, "commit", "-qm", "x"], check=True)
+        subprocess.run(["git", "-C", str(self.repo), "-c", "protocol.file.allow=always", *g,
+                        "submodule", "add", "-q", str(lib), "lib"], check=True, capture_output=True)
+        self.init()
+        files = self.state()["baseline"]["files"]
+        self.assertEqual("160000", files["lib"]["mode"])
+        with self.assertRaisesRegex(m.Invalid, "arquivo regular"):
+            self.base("lib")
 
     def test_duplicate_legacy_stage_rejected(self):
         state = m.empty(self.task)

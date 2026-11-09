@@ -277,7 +277,10 @@ def record(event,local,version=None,now=None,proof=None,proof_kind="execucao"):
     with lock(root):
         state=load_state(root)
         # Equivalência conceitual ignora versão do aplicativo; nenhum dado original entra na chave.
-        equivalent=next((k for k,v in state['items'].items() if v['category']==proposal['categoria']),None)
+        # Mesma categoria é a mesma ficha. Única exceção: a anterior foi enviada e a versão mudou,
+        # para avisar que o problema continua. Recusa vale em qualquer versão.
+        equivalent=next((k for k,v in state['items'].items() if v['category']==proposal['categoria']
+                         and not (v['status']=='enviado' and item_version(root,k,v)!=proposal['versao_seiva'])),None)
         if equivalent:
             current=state['items'][equivalent]
             if evidence and current['status'] not in ('enviado','incerto','enviando','recusado') and current.get('evidence')!=evidence:
@@ -285,12 +288,18 @@ def record(event,local,version=None,now=None,proof=None,proof_kind="execucao"):
             return {'status':'duplicada','id':equivalent}
         size=token_size(proposal)
         atomic(root/(key+'.json'),raw)
-        state['items'][key]={'category':proposal['categoria'],'created_at':now,'status':'local',
+        state['items'][key]={'category':proposal['categoria'],'version':proposal['versao_seiva'],'created_at':now,'status':'local',
             'size':size,'receipt':None,'review':None,'issue':None,'evidence':evidence,'analysis':None}
         state['items'][key]['status']='aguarda-analise' if evidence else 'aguarda-evidencia'
         save(root,state)
     return {'status':('aguarda-analise' if evidence else 'aguarda-evidencia') if size['value']<=TARGET_TOKENS else 'revisao-local-acima-alvo',
             'id':key,'size':size}
+
+
+def item_version(root,key,value):
+    if value.get('version'):return value['version']
+    try:return validate(parse(read_file(root/(key+'.json'))))['versao_seiva']
+    except (OSError,ValueError):return None
 
 
 def item(root,key):
@@ -405,7 +414,7 @@ def send(local,key,review_id,confirm=False):
         if token_size(parse(raw))['value']>TARGET_TOKENS:raise Refused('payload acima do alvo permanece local')
         # Antes do primeiro efeito de rede. Queda em qualquer ponto posterior nunca causa retry automático.
         value['status']='enviando';save(root,state)
-        tmp=None
+        tmp=None;create_started=False
         try:
             query='"seiva-insight:v1:'+digest_payload(raw)+'" in:body'
             matches=json.loads(run_gh(['issue','list','--repo',REPO_URL,'--state','all','--search',query,'--json','number,url','--limit','100']))
@@ -424,10 +433,15 @@ def send(local,key,review_id,confirm=False):
             fd,tmp=tempfile.mkstemp(prefix='issue-',suffix='.txt',dir=root)
             with os.fdopen(fd,'wb') as f:os.fchmod(f.fileno(),0o600);f.write(issue_body(raw))
             check_dispatch(root,key,raw,receipt)
+            create_started=True
             url=run_gh(['issue','create','--repo',REPO_URL,'--title',issue_title(raw),'--body-file',tmp])
             number=issue_number(url);value.update(status='enviado',issue=number);save(root,state)
             return {'status':'enviado','issue':number}
         except (Refused,ValueError,TypeError,KeyError,OSError):
+            if not create_started:
+                # Nenhuma criação foi pedida ao GitHub: nada foi publicado. A autorização caduca.
+                value.update(status='local',receipt=None,review=None);save(root,state)
+                raise Refused('nada foi publicado; prepare e autorize de novo se ainda quiser enviar') from None
             value['status']='incerto';save(root,state)
             raise Refused('envio não confirmado; ficha preservada, sem retransmissão automática') from None
         finally:
@@ -445,6 +459,17 @@ def reconcile(local,key,number):
             raise Refused('issue não corresponde à ficha aprovada')
         value.update(status='enviado',issue=number);save(root,state)
         return {'status':'conciliado','issue':number}
+
+
+def reconcile_absent(local,key,confirmed=False):
+    """A pessoa conferiu no GitHub que a issue não existe; só então a ficha volta a ser local."""
+    if not confirmed:raise Refused('confirme a conferência manual com --confirmo-que-nao-existe')
+    root=private_local(local)
+    with lock(root):
+        state,value,raw=item(root,key)
+        if value['status'] not in ('incerto','enviando'):raise Refused('não há envio incerto para conciliar')
+        value.update(status='local',receipt=None,review=None,issue=None);save(root,state)
+        return {'status':'conciliado-sem-publicacao','sent':False}
 
 
 def receive(source,central=None,now=None):
@@ -501,7 +526,12 @@ def validate_revision_changes(repo,base,head):
     # A lista vem do Git confiável, nunca de um subconjunto indicado pelo contribuidor.
     if not all(re.fullmatch('[0-9a-f]{40}',v) for v in (base,head)):
         raise Refused('base e revisão precisam ser commits completos')
-    names=[v.decode('utf-8') for v in git_read(repo,'diff','--no-ext-diff','--name-only','-z',base,head).split(b'\0') if v]
+    # Sem detecção de renomeação: uma troca A→B aparece como exclusão de A mais adição de B.
+    fields=[v.decode('utf-8') for v in git_read(repo,'diff','--no-ext-diff','--no-renames','--name-status','-z',base,head).split(b'\0') if v]
+    if len(fields)%2:raise Refused('lista de alterações Git inválida')
+    pairs=list(zip(fields[0::2],fields[1::2]))
+    if any(status!='A' for status,_ in pairs):raise Refused('revisão contém exclusão, alteração ou troca de ficha')
+    names=[name for _,name in pairs]
     if not names or len(names)>10:raise Refused('lote vazio ou acima de dez fichas')
     if any(not re.fullmatch(r'insights/incoming/[0-9a-f]{64}\.json',name) for name in names):
         raise Refused('revisão altera arquivo fora do local de recebimento')
@@ -573,6 +603,7 @@ def main():
         if name=='consentir':p.add_argument('--decisao',choices=['autorizar','recusar'],required=True)
         if name=='enviar':p.add_argument('--confirmar-publicacao',action='store_true')
         if name=='conciliar':p.add_argument('--issue',type=int,required=True)
+    p=sub.add_parser('conciliar-ausente');p.add_argument('--local',required=True);p.add_argument('--id',required=True);p.add_argument('--confirmo-que-nao-existe',action='store_true')
     p=sub.add_parser('refletir');p.add_argument('--local',required=True);p.add_argument('--id',required=True);p.add_argument('--nota-local',required=True)
     p=sub.add_parser('extrair');p.add_argument('--antes',required=True);p.add_argument('--depois',required=True);p.add_argument('--local',required=True);p.add_argument('--evidencia-local',required=True);p.add_argument('--tipo-evidencia',choices=['execucao','teste','feedback'],default='execucao')
     p=sub.add_parser('receber');p.add_argument('--arquivo',required=True)
@@ -587,6 +618,7 @@ def main():
         elif args.command=='consentir':result=consent(args.local,args.id,args.revisao,args.decisao)
         elif args.command=='enviar':result=send(args.local,args.id,args.revisao,args.confirmar_publicacao)
         elif args.command=='conciliar':result=reconcile(args.local,args.id,args.issue)
+        elif args.command=='conciliar-ausente':result=reconcile_absent(args.local,args.id,args.confirmo_que_nao_existe)
         elif args.command=='refletir':result=reflect(args.local,args.id,args.nota_local)
         elif args.command=='extrair':result=extract(args.antes,args.depois,args.local,args.evidencia_local,args.tipo_evidencia)
         elif args.command=='receber':result=receive(args.arquivo)

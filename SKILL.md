@@ -8,7 +8,7 @@ description: |
 license: MIT
 compatibility: Núcleo independente do aplicativo. Scripts exigem git, bash e dependências verificadas; estado e monitor usam Python 3. Capacidades de agentes, modelos e medição são detectadas por ambiente.
 metadata:
-  version: "1.5.0"
+  version: "1.6.0"
   author: "JulianoSSR"
 ---
 
@@ -104,7 +104,7 @@ Recalcule lentes pelo diff. N1 tem revisor; N2, adversário e lente de sinal nov
 
 Atualize os registros canônicos e respeite o protocolo de entrega, commit e publicação do projeto. Informe mudança, prova, pendências, limitações, decisões e independência. Achado grave aceito precisa de responsável, escopo, motivo e autorização válida; inegociável não admite aceite.
 
-Meça pela fonte disponível com intervalo da tarefa, incluindo tentativas. Com `medir.sh`, confirme suporte e atribuição antes de usar números. Registre aprendizado local em `julianossr.md`, sem expor dados privados. Conteúdo público deriva apenas de avaliação sanitizada.
+Meça pela fonte disponível com intervalo da tarefa, incluindo tentativas. Com `medir.sh`, confirme suporte e atribuição antes de usar números; ele separa os papéis pela descrição de cada agente, que começa pelo papel (`Construtor: ...`). Registre aprendizado local em `julianossr.md`, sem expor dados privados. Conteúdo público deriva apenas de avaliação sanitizada.
 
 ## Comunicação e aprendizado local
 

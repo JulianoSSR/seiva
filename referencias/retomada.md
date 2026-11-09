@@ -44,7 +44,7 @@ Uma leva interrompida é retomada por **tentativas válidas**, não pela presen�
 
 ## Migração e parada limpa
 
-Os wrappers preservam os comandos básicos e migram estado legado de forma explícita. Conclusão feita legada sem comprovação fica não comprovada e exige revalidação; o histórico permanece preservado. Migração não inventa base, propriedade de arquivos, aceite ou prova. Preserve originais e declare campos sem evidência; o estado só avança depois de conferir os requisitos faltantes.
+Os wrappers preservam os comandos básicos e migram estado legado de forma explícita. Conclusão feita legada sem comprovação fica não comprovada e exige revalidação; o histórico permanece preservado. Migração não inventa base, propriedade de arquivos, aceite ou prova. Preserve originais e declare campos sem evidência; o estado só avança depois de conferir os requisitos faltantes. `conferir` só lê a tarefa legada; a primeira marcação cria `estado.json` e guarda o original em `progresso.legado.md`. `PROXIMA` aponta a primeira etapa que não está feita nem pulada, e as legadas sem prova aparecem à parte, para revalidar sem refazer. Etapa `pulada` exige motivo (`pulada: motivo`).
 
 Ao chegar ao teto de custo, contexto, rodadas ou capacidade: não abra outra leva; guarde próxima ação, tentativas em curso, achados abertos, orçamento e artefatos. Diga motivo e caminho absoluto para retomar. Uma pausa não aprova o portão e não autoriza rebaixamento.
 

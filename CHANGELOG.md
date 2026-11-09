@@ -1,6 +1,19 @@
 # Registro de mudanças
 
-## Em desenvolvimento
+## 1.6.0 (2026-11-09)
+
+Correções da revisão independente do Claude Code sobre o `9d773be`:
+
+- `conferir` volta a funcionar em tarefa legada cujo artefato da etapa 0 é o perfil da pasta de trabalho; tarefa legada é só lida, a 1ª gravação guarda `progresso.legado.md`, e `PROXIMA`/`pendentes` apontam a etapa real, com o legado sem prova listado à parte. `pendentes` não cai por uma tarefa inválida.
+- O monitor ignora mensagens `<synthetic>` do Claude Code, que travavam a coleta da fonte inteira.
+- `validar-lote` não usa detecção de renomeação: troca de ficha conta como exclusão e é recusada.
+- `pulada` exige motivo.
+- Submódulo entra na base como gitlink; `nova-tarefa.sh` apaga a pasta que criou quando o `init` falha e não copia mais o molde de `progresso.md` (tarefa nova deixa de sair como migrada).
+- Aprendizado: falha antes do `create` devolve a ficha para `local` e anula a autorização; `conciliar-ausente --confirmo-que-nao-existe` tira do `incerto` depois de conferência manual; ficha enviada pode voltar em versão nova da Seiva, e recusa continua valendo em qualquer versão.
+- A regra da descrição do agente começando pelo papel volta ao SKILL, porque o `medir.sh` depende dela.
+- Versão 1.6.0: o contrato de `marcar feita` mudou em relação à 1.5.0.
+
+### Entregue no `9d773be` (antes publicado como "Em desenvolvimento")
 
 - Seis capacidades adaptadas com prova/reflexão privadas obrigatórias, candidato não comprovado sem sugestão, extração mecânica de cache e microajuste apenas conceitual. Logs/caminhos/hashes da origem não são exportados; ajuste de regras e execução privilegiada não ocorrem durante a tarefa cliente.
 

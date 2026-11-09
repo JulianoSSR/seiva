@@ -39,6 +39,36 @@ class LearningTests(unittest.TestCase):
     def test_same_concept_across_versions_dedup(self):
         x=self.proposal();y=a.record({'tipo':'falhas','quantidade':99},self.local,version='1.6.0')
         self.assertEqual(x['id'],y['id'])
+    def test_sent_concept_can_return_in_new_version(self):
+        key,rid=self.approved()
+        with patch.object(a,'run_gh',side_effect=['[]','https://github.com/JulianoSSR/seiva/issues/7']):
+            a.send(self.local,key,rid,True)
+        again=a.record({'tipo':'falhas','quantidade':3},self.local,version=a.current_version())
+        self.assertEqual(again['status'],'duplicada')
+        newer=a.record({'tipo':'falhas','quantidade':3},self.local,version='9.9.9',proof=self.proof,proof_kind='teste')
+        self.assertNotEqual(newer.get('id'),key);self.assertNotEqual(newer['status'],'duplicada')
+    def test_refusal_holds_in_new_version(self):
+        key=self.proposal()['id'];rid=a.prepare(self.local,key,now=100)['review']['review_id']
+        a.consent(self.local,key,rid,'recusar',now=101)
+        self.assertEqual(a.record({'tipo':'falhas','quantidade':3},self.local,version='9.9.9')['status'],'duplicada')
+    def test_uncertain_without_issue_reconciled_only_with_confirmation(self):
+        key,rid=self.approved()
+        with patch.object(a,'run_gh',side_effect=['[]',a.Refused('network')]):
+            with self.assertRaises(a.Refused):a.send(self.local,key,rid,True)
+        self.assertEqual(a.load_state(self.local)['items'][key]['status'],'incerto')
+        with self.assertRaises(a.Refused):a.reconcile_absent(self.local,key)
+        self.assertEqual(a.reconcile_absent(self.local,key,True)['status'],'conciliado-sem-publicacao')
+        item=a.load_state(self.local)['items'][key]
+        self.assertEqual((item['status'],item['receipt'],item['review']),('local',None,None))
+    def test_revision_rename_counts_as_deletion(self):
+        g=lambda *x:subprocess.run(['git','-C',str(self.repo),'-c','user.email=t@t','-c','user.name=t',*x],check=True,capture_output=True).stdout.decode().strip()
+        incoming=self.repo/'insights/incoming';incoming.mkdir(parents=True)
+        old=a.canonical(a.payload_for('falhas','1.5.0'));new=a.canonical(a.payload_for('falhas','1.5.1'))
+        ko,kn=a.digest_payload(old),a.digest_payload(new)
+        (incoming/(ko+'.json')).write_bytes(old);g('add','insights');g('commit','-qm','a');base=g('rev-parse','HEAD')
+        g('mv','insights/incoming/'+ko+'.json','insights/incoming/'+kn+'.json');(incoming/(kn+'.json')).write_bytes(new)
+        g('commit','-qam','b');head=g('rev-parse','HEAD')
+        with self.assertRaisesRegex(a.Refused,'exclusão'):a.validate_revision_changes(self.repo,base,head)
     def test_no_repeated_failure_no_proposal(self):
         self.assertEqual(a.record({'tipo':'falhas','quantidade':1},self.local)['status'],'sem-proposta')
         self.assertFalse(self.local.exists())
@@ -133,7 +163,9 @@ class LearningTests(unittest.TestCase):
             with self.assertRaises(a.Refused):a.send(self.local,key,rid,True)
             self.assertEqual(gh.call_count,1)
         self.assertEqual((self.local/(key+'.json')).read_bytes(),before)
-        self.assertEqual(a.load_state(self.local)['items'][key]['status'],'incerto')
+        # Falha antes do create: nada publicado, autorização anulada, sem nova tentativa automática.
+        item=a.load_state(self.local)['items'][key]
+        self.assertEqual((item['status'],item['receipt']),('local',None))
     def test_uncertain_issue_create_no_second_create(self):
         key,rid=self.approved()
         with patch.object(a,'run_gh',side_effect=['[]',a.Refused('network')]) as gh:
@@ -148,7 +180,7 @@ class LearningTests(unittest.TestCase):
             self.assertFalse(any('create' in c.args[0] for c in gh.call_args_list))
     def test_reconcile_only_same_public_issue(self):
         key,rid=self.approved()
-        with patch.object(a,'run_gh',side_effect=a.Refused('synthetic')):
+        with patch.object(a,'run_gh',side_effect=['[]',a.Refused('synthetic')]):
             with self.assertRaises(a.Refused):a.send(self.local,key,rid,True)
         body=a.issue_body((self.local/(key+'.json')).read_bytes()).decode()
         with patch.object(a,'run_gh',return_value=json.dumps({'body':body,'url':'https://github.com/JulianoSSR/seiva/issues/9'})):
@@ -257,23 +289,23 @@ class LearningTests(unittest.TestCase):
         self.local.mkdir(parents=True);self.local.chmod(0o755)
         with self.assertRaises(a.Refused):self.proposal()
     def test_revision_rejects_full_changeset_outside_incoming(self):
-        with patch.object(a,'git_read',return_value=b'insights/incoming/'+b'a'*64+b'.json\0scripts/evil.py\0') as reader:
+        with patch.object(a,'git_read',return_value=b'A\0insights/incoming/'+b'a'*64+b'.json\0A\0scripts/evil.py\0') as reader:
             # Validação de conteúdo da primeira ficha não pode ocultar arquivo seguinte; ambos precisam passar.
             with self.assertRaises(a.Refused):a.validate_revision_changes(self.repo,'a'*40,'b'*40)
             self.assertEqual(reader.call_count,1)
     def test_revision_uses_objects_not_checked_out_programs(self):
         raw=a.canonical(a.payload_for('falhas'));key=a.digest_payload(raw);name='insights/incoming/'+key+'.json'
-        replies=[name.encode()+b'\0',b'100644 blob '+b'c'*40+b'\t'+name.encode()+b'\0',str(len(raw)).encode(),raw]
+        replies=[b'A\0'+name.encode()+b'\0',b'100644 blob '+b'c'*40+b'\t'+name.encode()+b'\0',str(len(raw)).encode(),raw]
         with patch.object(a,'git_read',side_effect=replies) as reader:
             self.assertEqual(a.validate_revision_changes(self.repo,'a'*40,'b'*40),[key])
             self.assertEqual(reader.call_args.args[1:3],('cat-file','blob'))
     def test_revision_rejects_executable_mode(self):
         name=b'insights/incoming/'+b'a'*64+b'.json'
-        with patch.object(a,'git_read',side_effect=[name+b'\0',b'100755 blob '+b'c'*40+b'\t'+name]):
+        with patch.object(a,'git_read',side_effect=[b'A\0'+name+b'\0',b'100755 blob '+b'c'*40+b'\t'+name]):
             with self.assertRaises(a.Refused):a.validate_revision_changes(self.repo,'a'*40,'b'*40)
     def test_revision_checks_object_size_before_content(self):
         name=b'insights/incoming/'+b'a'*64+b'.json'
-        with patch.object(a,'git_read',side_effect=[name+b'\0',b'100644 blob '+b'c'*40+b'\t'+name,b'999999999']) as reader:
+        with patch.object(a,'git_read',side_effect=[b'A\0'+name+b'\0',b'100644 blob '+b'c'*40+b'\t'+name,b'999999999']) as reader:
             with self.assertRaises(a.Refused):a.validate_revision_changes(self.repo,'a'*40,'b'*40)
             self.assertEqual(reader.call_count,3)
     def test_revision_hash_arguments_cannot_inject_options(self):
@@ -329,7 +361,7 @@ class LearningTests(unittest.TestCase):
         with patch.object(a,'run_gh',side_effect=lookup) as gh:
             with self.assertRaises(a.Refused):a.send(self.local,key,rid,True)
             self.assertEqual(gh.call_count,1)
-        self.assertEqual(a.load_state(self.local)['items'][key]['status'],'incerto')
+        self.assertEqual(a.load_state(self.local)['items'][key]['status'],'local')
     def test_payload_changed_during_lookup_blocks_publication(self):
         key,rid=self.approved()
         def lookup(command):
