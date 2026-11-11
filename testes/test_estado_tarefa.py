@@ -610,5 +610,204 @@ class StateTests(unittest.TestCase):
         self.assertIn("registro não prova processo vivo", out.getvalue())
         self.assertIn("consulte a ferramenta de execução", out.getvalue())
 
+    # --- Ajustes 1.7.0: interrupção, modelo, contexto, medição, migração retroativa ---
+
+    def stale(self, aid="r1", minutes=60):
+        import datetime as dt
+        st = self.state()
+        old = (dt.datetime.now().astimezone() - dt.timedelta(minutes=minutes)).isoformat(timespec="seconds")
+        st["attempts"][aid]["last_seen_at"] = old
+        st["attempts"][aid]["started_at"] = old
+        (self.task / "estado.json").write_text(json.dumps(st))
+
+    def test_sweep_turns_stale_running_into_interrupted_without_redispatch(self):
+        self.start()
+        self.quiet(m.attempt_sweep, self.task)
+        self.assertEqual("running", self.state()["attempts"]["r1"]["status"])  # sinal recente: nada muda
+        self.stale()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.attempt_sweep(self.task)
+        self.assertIn("INTERROMPIDAS r1", out.getvalue())
+        a = self.state()["attempts"]["r1"]
+        self.assertEqual("interrompida", a["status"])
+        self.assertIsNone(a["terminal"])
+        self.assertIsNone(a["interruption"]["tokens_spent"])
+
+    def test_check_sweeps_automatically_and_fails_until_decision(self):
+        self.start()
+        self.stale()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = m.check(self.task)
+        self.assertIn("VARREDURA automática", out.getvalue())
+        self.assertEqual("interrompida", self.state()["attempts"]["r1"]["status"])
+        self.assertEqual(1, code)
+
+    def test_report_write_counts_as_signal(self):
+        self.start()
+        self.stale()
+        (self.task / "report.md").write_text("trabalho em andamento")  # relatório gravado agora = sinal de vida
+        self.quiet(m.attempt_sweep, self.task)
+        self.assertEqual("running", self.state()["attempts"]["r1"]["status"])
+
+    def test_watch_marks_stale_and_stops_when_nothing_runs(self):
+        self.start()
+        self.stale()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = m.attempt_watch(self.task, interval=1, duration=5)
+        self.assertEqual(0, code)
+        self.assertIn("INTERROMPIDA r1", out.getvalue())
+        self.assertIn("nenhuma tentativa running", out.getvalue())
+
+    def test_watch_stops_at_duration_with_running_and_says_so(self):
+        self.start()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.attempt_watch(self.task, interval=1, duration=1)
+        self.assertIn("duração esgotada", out.getvalue())
+        self.assertEqual("running", self.state()["attempts"]["r1"]["status"])
+
+    def test_ping_refreshes_signal(self):
+        self.start()
+        self.stale()
+        self.quiet(m.attempt_ping, self.task, "r1")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.attempt_sweep(self.task)
+        self.assertIn("INTERROMPIDAS nenhuma", out.getvalue())
+
+    def test_interrupted_job_needs_explicit_resume_decision(self):
+        self.start()
+        self.quiet(m.attempt_interrupt, self.task, "r1", "limite de 5h", 123456)
+        with self.assertRaisesRegex(m.Invalid, "interrompida do mesmo trabalho"):
+            m.attempt_start(self.task, "r2", "agent", "package.md", "report.md")
+        self.quiet(m.attempt_start, self.task, "r2", "agent", "package.md", "report.md", resume="r1")
+        st = self.state()
+        self.assertEqual("r2", st["attempts"]["r1"]["resolved_by"])
+        self.assertEqual(123456, st["attempts"]["r1"]["interruption"]["tokens_spent"])
+        self.assertEqual("r1", st["attempts"]["r2"]["resumes"])
+
+    def test_resume_rejects_attempt_that_was_not_interrupted(self):
+        self.start()
+        with self.assertRaisesRegex(m.Invalid, "running sobreposta"):
+            m.attempt_start(self.task, "r2", "agent", "package.md", "report.md", resume="r1")
+        (self.task / "p2.md").write_text("other")
+        with self.assertRaisesRegex(m.Invalid, "interrompida e sem conclusão"):
+            m.attempt_start(self.task, "r2", "other", "p2.md", "r2.md", resume="r1")
+
+    def test_complete_report_of_interrupted_agent_is_accepted_and_recorded(self):
+        self.start()
+        self.quiet(m.attempt_interrupt, self.task, "r1", "limite de 5h")
+        self.report("achados completos")
+        self.complete()
+        a = self.state()["attempts"]["r1"]
+        self.assertEqual("concluido", a["status"])
+        self.assertTrue(a["completed_after_interruption"])
+        self.assertTrue(m.attempt_valid(self.task, self.state(), "r1"))
+
+    def test_interrupted_report_without_final_marker_is_refused(self):
+        self.start()
+        self.quiet(m.attempt_interrupt, self.task, "r1", "limite de 5h")
+        (self.task / "report.md").write_text("achados pela metade")
+        with self.assertRaisesRegex(m.Invalid, "marcador final"):
+            self.complete()
+
+    def test_interrupt_requires_reason(self):
+        self.start()
+        with self.assertRaisesRegex(m.Invalid, "motivo"):
+            m.attempt_interrupt(self.task, "r1", " ")
+
+    def test_stage_interrupted_needs_reason_and_is_resume_point(self):
+        with self.assertRaisesRegex(m.Invalid, "exige motivo"):
+            m.mark(self.task, "6", "interrompida", [])
+        self.quiet(m.mark, self.task, "6", "interrompida: limite de 5h", [])
+        st = self.state()
+        self.assertEqual("interrompida: limite de 5h", st["stages"]["6"]["status"])
+        self.assertFalse(m.stage_valid(self.task, st, st["stages"]["6"]))
+
+    def test_model_and_category_recorded_and_invalid_category_refused(self):
+        (self.task / "package.md").write_text("instructions")
+        with self.assertRaisesRegex(m.Invalid, "categoria inválida"):
+            m.attempt_start(self.task, "r1", "agent", "package.md", "report.md", category="barato")
+        self.quiet(m.attempt_start, self.task, "r1", "agent", "package.md", "report.md",
+                   model="fable", category="forte", context_tokens=40000)
+        a = self.state()["attempts"]["r1"]
+        self.assertEqual(("fable", "forte", 40000), (a["model"], a["model_category"], a["inherited_context_tokens"]))
+        self.report("ok")
+        self.quiet(m.attempt_complete, self.task, "r1", "concluido", ["report.md"], "passou",
+                   real_model="claude-fable", tokens=9000)
+        self.assertEqual("claude-fable", self.state()["attempts"]["r1"]["model_real"])
+
+    def test_missing_model_is_warned_not_invented(self):
+        out = io.StringIO()
+        (self.task / "package.md").write_text("instructions")
+        with redirect_stdout(out):
+            m.attempt_start(self.task, "r1", "agent", "package.md", "report.md")
+        self.assertIn("categoria/modelo não registrados", out.getvalue())
+        self.assertIsNone(self.state()["attempts"]["r1"]["model_category"])
+
+    def test_context_above_limit_refused_unless_justified(self):
+        (self.task / "package.md").write_text("instructions")
+        with self.assertRaisesRegex(m.Invalid, "acima de 150000"):
+            m.attempt_start(self.task, "r1", "agent", "package.md", "report.md", context_tokens=200000)
+        self.assertNotIn("r1", (self.state()["attempts"] if (self.task / "estado.json").exists() else {}))
+        self.quiet(m.attempt_start, self.task, "r1", "agent", "package.md", "report.md",
+                   context_tokens=200000, above_limit="não dá para dividir: um só arquivo")
+        self.assertEqual("não dá para dividir: um só arquivo", self.state()["attempts"]["r1"]["above_limit_reason"])
+
+    def test_parallel_limit_counts_running_attempts(self):
+        for i in range(m.MAX_PARALLEL):
+            (self.task / ("p%d.md" % i)).write_text("pacote %d" % i)
+            self.quiet(m.attempt_start, self.task, "a%d" % i, "ag%d" % i, "p%d.md" % i, "r%d.md" % i)
+        (self.task / "px.md").write_text("pacote x")
+        with self.assertRaisesRegex(m.Invalid, "limite"):
+            m.attempt_start(self.task, "ax", "agx", "px.md", "rx.md")
+
+    def test_usage_snapshots_produce_delta_and_never_zero_missing_fields(self):
+        self.quiet(m.usage, self.task, "antes", {"input": 100, "output": 50, "cache_read": 1000, "cache_write": None},
+                   "fable", "usage da sessão")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.usage(self.task, "depois", {"input": 400, "output": 90, "cache_read": 5000, "cache_write": None},
+                    "fable", "usage da sessão")
+        d = self.state()["usage"]["delta"]
+        self.assertEqual((300, 40, 4000), (d["input"], d["output"], d["cache_read"]))
+        self.assertNotIn("cache_write", d)
+        self.assertIn("FECHAMENTO", out.getvalue())
+
+    def test_usage_requires_source_and_a_number(self):
+        with self.assertRaisesRegex(m.Invalid, "--fonte"):
+            m.usage(self.task, "antes", {"input": 1}, None, "")
+        with self.assertRaisesRegex(m.Invalid, "ao menos um número"):
+            m.usage(self.task, "antes", {"input": None}, None, "x")
+
+    def test_retroactive_stage_marks_legacy_work_done_outside_state(self):
+        self.start()
+        (self.task / "plano.md").write_text("plano feito antes do estado existir")
+        with self.assertRaisesRegex(m.Invalid, "--retroativa"):
+            m.mark(self.task, "3", "feita", ["plano.md"], attempt="r1", retroactive=True)
+        with self.assertRaisesRegex(m.Invalid, "--evidence"):
+            m.mark(self.task, "3", "feita", ["plano.md"], retroactive=True)
+        self.quiet(m.mark, self.task, "3", "feita", ["plano.md"], evidence="feito na sessão de 09/11, ver registro.md",
+                   retroactive=True)
+        st = self.state()
+        self.assertEqual("retroativa", st["stages"]["3"]["proof"]["kind"])
+        self.assertTrue(m.stage_valid(self.task, st, st["stages"]["3"]))
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.check(self.task)
+        self.assertIn("RETROATIVA", out.getvalue())
+        (self.task / "plano.md").write_text("mudou")
+        self.assertFalse(m.stage_valid(self.task, self.state(), self.state()["stages"]["3"]))
+
+    def test_check_warns_when_attempts_exist_but_stage_zero_pending(self):
+        self.start()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.check(self.task)
+        self.assertIn("etapa 0 está pendente", out.getvalue())
+
 if __name__ == "__main__":
     unittest.main()

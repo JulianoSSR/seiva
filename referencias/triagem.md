@@ -64,6 +64,6 @@ Um N3 grande vira etapas menores, cada uma com entrega própria. Sinais: plano c
 Nível: N2 — regra de negócio nova em 4 arquivos; usa o filtro de cliente existente sem mudá-lo
 Superfícies: dados (escrita em tabela), contrato (app instalado lê o campo)
 Lentes: plano → adversário, dados (sinal: escrita em tabela), contrato (sinal: campo lido pelo app) · diff → adversário + lente de sinal novo
-Categorias: batedor rapido · construtor padrao · adversário padrao · lentes padrao · implementador padrao · verificador padrao
+Categorias: batedor rapido · construtor padrao · adversário padrao · lentes padrao · implementador padrao · verificador padrao · revisor padrao · conserto padrao (uma por papel; o disparo passa o modelo explícito e o relatório registra o real, ver [modelos](modelos.md))
 Orçamento: 8 agentes · paradas com o usuário: plano, entrega
 ```

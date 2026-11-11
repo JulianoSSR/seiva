@@ -11,7 +11,7 @@ Confirme no ambiente atual:
 | Capacidade | Evidência necessária |
 |---|---|
 | Subagentes | ferramenta ou comando realmente disponível e autorizado |
-| Modelo por agente | parâmetro suportado e modelos acessíveis nesta conta |
+| Modelo por agente | parâmetro suportado e modelos acessíveis nesta conta; sem ele, a tarefa registra a lacuna e não declara independência |
 | Contexto limpo | sem herdar conversa; instruções fixas ainda são declaradas |
 | Paralelismo | limite de agentes e exclusividade dos arquivos |
 | Somente leitura | restrição técnica real; se for só instrução, diga isso |

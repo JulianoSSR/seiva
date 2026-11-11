@@ -20,10 +20,28 @@ import uuid
 
 NAMES = ["Terreno", "Triagem", "Reconhecer", "Propor", "Atacar o plano", "Decidir",
          "Construir", "Verificar", "Atacar o código", "Entregar e aprender"]
-STATUSES = {"pendente", "em-curso", "feita", "pulada"}
+STATUSES = {"pendente", "em-curso", "feita", "pulada", "interrompida"}
+# Tentativa: running -> interrompida (sem sinal ou por limite) -> concluido/failed/cancelled.
+STALE_MINUTES = 15          # sem sinal por este tempo, "running" é suspeita de interrupção
+CONTEXT_LIMIT = 150000      # tokens: pacote + contexto herdado acima disto pedem divisão
+MAX_PARALLEL = 3            # tentativas running ao mesmo tempo
+CATEGORIES = {"script", "rapido", "padrao", "forte", "profundo"}
 
 class Invalid(Exception):
     pass
+
+def tuned(task, param):
+    """Valor em vigor: ajuste local automático (scripts/ajustes.py) ou o padrão. Falha de leitura cai no padrão."""
+    default = {"stale_minutes": STALE_MINUTES, "context_limit": CONTEXT_LIMIT}[param]
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import ajustes
+        return ajustes.effective_for_task(task, param)
+    except Exception:
+        return default
+    finally:
+        if sys.path and sys.path[0] == str(Path(__file__).resolve().parent):
+            sys.path.pop(0)
 
 def now():
     return dt.datetime.now().astimezone().isoformat(timespec="seconds")
@@ -370,17 +388,21 @@ def artifact(task, name, extra_roots=()):
         raise Invalid("artefato não existe ou é link: " + str(path))
     return {"sha256": digest(path.read_bytes())}
 
-def mark(task, number, status, names, deps=(), attempt=None, evidence="", allow_roots=()):
+def mark(task, number, status, names, deps=(), attempt=None, evidence="", allow_roots=(), retroactive=False):
     task = validate_task(task)
     if number not in map(str, range(10)) or status.split(":", 1)[0] not in STATUSES or "\n" in status:
         raise Invalid("uso: progresso.sh <pasta-da-tarefa> marcar <0-9> <pendente|em-curso|feita|pulada> [artefato...]")
     status = status.replace("|", "/")
     if status.split(":", 1)[0] == "pulada" and not status.partition(":")[2].strip():
         raise Invalid("etapa pulada exige motivo: marcar N 'pulada: motivo'")
+    if status.split(":", 1)[0] == "interrompida" and not status.partition(":")[2].strip():
+        raise Invalid("etapa interrompida exige motivo: marcar N 'interrompida: limite de 5h às 16:39'")
     done = status.split(":", 1)[0] == "feita"
     arts = {name: artifact(task, name, allow_roots) for name in names} if done else {}
     if done and (not arts or (not attempt and not evidence.strip())):
         raise Invalid("etapa feita exige artefatos e --attempt concluído ou --evidence para etapa mecânica")
+    if retroactive and (not done or attempt or not evidence.strip()):
+        raise Invalid("--retroativa vale só para etapa feita, com --evidence dizendo onde a etapa foi feita, e sem --attempt")
     with lock(task / ".estado.lock"):
         state = readstate(task, create=True)
         state["artifact_roots"] = sorted(set(state.get("artifact_roots", []) + [str(Path(r).resolve()) for r in allow_roots]))
@@ -393,7 +415,9 @@ def mark(task, number, status, names, deps=(), attempt=None, evidence="", allow_
                 raise Invalid("artefatos da etapa não conferem com o terminal da tentativa")
             proof = {"kind": "attempt", "attempt_id": attempt}
         elif done:
-            proof = {"kind": "mechanical", "evidence": evidence.strip()}
+            proof = {"kind": "retroativa" if retroactive else "mechanical", "evidence": evidence.strip()}
+            if retroactive:
+                proof["recorded_at"] = now()
         state["stages"][number].update(status=status, when=now(), artifacts=arts, proof=proof,
                                       dependencies={name: artifact(task, name, allow_roots) for name in deps})
         save(task, state)
@@ -434,7 +458,7 @@ def stage_valid(task, state, stage):
     if stage["status"].split(":", 1)[0] != "feita" or not stage["artifacts"]:
         return False
     proof = stage.get("proof") or {}
-    if proof.get("kind") == "mechanical":
+    if proof.get("kind") in ("mechanical", "retroativa"):
         proven = bool(proof.get("evidence", "").strip())
     elif proof.get("kind") == "attempt":
         aid = proof.get("attempt_id")
@@ -448,6 +472,14 @@ def stage_valid(task, state, stage):
     return (proven and all(not changed(task, name, value) for name, value in stage["artifacts"].items())
             and all(not changed(task, name, value) for name, value in stage.get("dependencies", {}).items()))
 
+def minutes_since(stamp):
+    if not stamp:
+        return None
+    try:
+        return (dt.datetime.now().astimezone() - dt.datetime.fromisoformat(stamp)).total_seconds() / 60
+    except ValueError:
+        return None
+
 def check(task):
     task = validate_task(task)
     with lock(task / ".estado.lock"):
@@ -458,10 +490,28 @@ def check(task):
         elif not (task / "progresso.md").exists() or (task / "progresso.md").read_text() != markdown(state):
             atomic(task / "progresso.md", markdown(state))
         failures, nextstage = 0, None
+        if (task / "estado.json").exists():
+            stale = tuned(task, "stale_minutes")
+            swept = sweep_state(task, state, stale)  # a varredura é automática; só grava se achar algo
+            if swept:
+                save(task, state)
+                print("VARREDURA automática: " + ", ".join(swept) + " sem sinal há mais de %d min → interrompida" % stale)
         for aid, attempt in state["attempts"].items():
             if attempt.get("status") == "running" and attempt.get("terminal") is None:
                 print("TENTATIVA " + aid + " running · " + attempt["agent"] +
                       " · consulte a ferramenta de execução antes de redisparar; registro não prova processo vivo")
+            elif attempt.get("status") == "interrompida" and attempt.get("terminal") is None:
+                failures += 0 if attempt.get("resolved_by") else 1
+                spent = (attempt.get("interruption") or {}).get("tokens_spent")
+                print("TENTATIVA " + aid + " interrompida · " + attempt["agent"] + " · tokens já gastos: " +
+                      ("desconhecidos" if spent is None else str(spent)) +
+                      (" · retomada por " + attempt["resolved_by"] if attempt.get("resolved_by") else
+                       " · decida: aproveitar relatório válido (attempt-complete) ou redisparar com --retoma " + aid))
+            if attempt.get("terminal") is None and attempt.get("status") in {"running", "interrompida"} and not attempt.get("model_category"):
+                print("  ! " + aid + " sem categoria/modelo registrado: independência e custo não comprováveis")
+        if state["attempts"] and state["stages"]["0"]["status"].split(":", 1)[0] == "pendente":
+            print("AVISO há tentativas, mas a etapa 0 está pendente: se as etapas iniciais foram feitas fora do estado, "
+                  "marque com --retroativa e --evidence (migração de tarefa legada)")
         for n in range(10):
             s = state["stages"][str(n)]
             status = s["status"].split(":", 1)[0]
@@ -483,6 +533,10 @@ def check(task):
             if stale:
                 failures += 1
                 notes += " · DEPENDENCIA MUDOU: " + ", ".join(stale)
+            if status == "feita" and (s.get("proof") or {}).get("kind") == "retroativa":
+                notes += " · RETROATIVA (marcada depois; prova é a evidência registrada, não uma tentativa)"
+            if status == "interrompida":
+                notes += " · INTERROMPIDA (retome esta etapa; confira tentativas antes de redisparar)"
             if status == "feita":
                 for name, value in s["artifacts"].items():
                     result = changed(task, name, value)
@@ -532,32 +586,155 @@ def pending(work):
     if not found:
         print("nenhuma tarefa por terminar em " + str(work / "tarefas"))
 
-def attempt_start(task, attempt_id, agent, package, report):
+def attempt_start(task, attempt_id, agent, package, report, model=None, category=None, context_tokens=None,
+                  above_limit="", resume=None, max_parallel=MAX_PARALLEL):
     task = validate_task(task)
     if not re.fullmatch(r"[A-Za-z0-9._-]+", attempt_id):
         raise Invalid("identificador de tentativa inválido")
+    if category is not None and category not in CATEGORIES:
+        raise Invalid("categoria inválida; use: " + ", ".join(sorted(CATEGORIES)))
     with lock(task / ".estado.lock"):
         state = readstate(task, create=True)
         if attempt_id in state["attempts"]:
             raise Invalid("tentativa já registrada; use novo identificador")
         package_hash = artifact(task, package)
         report_path = artifact_path(task, report)
+        package_tokens = artifact_path(task, package).stat().st_size * 10 // 35
+        total = package_tokens + (context_tokens or 0)
+        limit = tuned(task, "context_limit")
+        if total > limit and not above_limit.strip():
+            raise Invalid("pacote + contexto herdado ≈ %d tokens, acima de %d: divida a tarefa ou grave o contexto curto e "
+                          "abra outra sessão; para seguir mesmo assim, --acima-do-limite 'motivo'" % (total, limit))
+        running = 0
         for existing in state["attempts"].values():
-            if existing.get("status") != "running" or existing.get("terminal") is not None:
+            if existing.get("terminal") is not None:
                 continue
             same_job = existing.get("agent") == agent and existing.get("package_hash") == package_hash["sha256"]
             same_report = artifact_path(task, existing["report"]) == report_path
-            if same_job or same_report:
-                raise Invalid("tentativa running sobreposta: " + existing["attempt_id"] +
-                              "; consulte a ferramenta de execução e registre cancelled/failed antes de redisparar")
+            if existing.get("status") == "running":
+                running += 1
+                if same_job or same_report:
+                    raise Invalid("tentativa running sobreposta: " + existing["attempt_id"] +
+                                  "; consulte a ferramenta de execução e registre cancelled/failed antes de redisparar")
+            elif existing.get("status") == "interrompida" and (same_job or same_report) and not existing.get("resolved_by"):
+                if resume != existing["attempt_id"]:
+                    raise Invalid("tentativa interrompida do mesmo trabalho: " + existing["attempt_id"] +
+                                  "; aproveite o relatório válido (attempt-complete) ou decida redisparar com --retoma " +
+                                  existing["attempt_id"])
+        if running >= max_parallel:
+            raise Invalid("já há %d tentativas running (limite %d); espere terminar ou aumente --max-paralelo com motivo" %
+                          (running, max_parallel))
+        if resume:
+            old = state["attempts"].get(resume)
+            if not old or old.get("status") != "interrompida" or old.get("terminal") is not None:
+                raise Invalid("--retoma exige uma tentativa interrompida e sem conclusão: " + str(resume))
+            old["resolved_by"] = attempt_id
         state["attempts"][attempt_id] = {"task_id": state["task_id"], "attempt_id": attempt_id, "agent": agent,
             "package": package, "package_hash": package_hash["sha256"], "report": report,
-            "status": "running", "started_at": now(), "terminal": None,
+            "status": "running", "started_at": now(), "last_seen_at": now(), "terminal": None,
+            "model": model, "model_category": category,
+            "package_tokens_est": package_tokens, "inherited_context_tokens": context_tokens,
+            "above_limit_reason": above_limit.strip() or None, "resumes": resume,
             "report_before": signature(fingerprint(artifact_path(task, report)))}
         save(task, state)
-        print("ATTEMPT " + attempt_id + " running")
+        print("ATTEMPT " + attempt_id + " running · pacote ≈ %d tokens · contexto herdado: %s" %
+              (package_tokens, "não informado" if context_tokens is None else context_tokens))
+        if category is None or model is None:
+            print("AVISO categoria/modelo não registrados: o relatório não poderá afirmar independência nem custo por papel")
 
-def attempt_complete(task, attempt_id, status, names, evidence):
+def attempt_ping(task, attempt_id):
+    task = validate_task(task)
+    with lock(task / ".estado.lock"):
+        state = readstate(task)
+        a = state["attempts"].get(attempt_id)
+        if not a or a["terminal"] is not None or a.get("status") != "running":
+            raise Invalid("tentativa ausente, terminal ou não running")
+        a["last_seen_at"] = now()
+        save(task, state)
+        print("ATTEMPT " + attempt_id + " sinal " + a["last_seen_at"])
+
+def attempt_interrupt(task, attempt_id, reason, tokens=None):
+    task = validate_task(task)
+    if not reason.strip():
+        raise Invalid("interrupção exige motivo (limite de uso, sessão fechada, falha)")
+    with lock(task / ".estado.lock"):
+        state = readstate(task)
+        a = state["attempts"].get(attempt_id)
+        if not a or a["terminal"] is not None or a.get("status") != "running":
+            raise Invalid("tentativa ausente, terminal ou não running")
+        interrupt(a, reason, tokens)
+        save(task, state)
+        print("ATTEMPT " + attempt_id + " interrompida")
+
+def interrupt(attempt, reason, tokens=None):
+    attempt["status"] = "interrompida"
+    attempt["interruption"] = {"at": now(), "last_seen_at": attempt.get("last_seen_at"),
+                               "reason": reason.strip(), "tokens_spent": tokens}
+
+def signal_age(task, a):
+    """Minutos desde o último sinal: o maior entre o ping e a última gravação do relatório."""
+    stamps = []
+    for value in (a.get("last_seen_at"), a.get("started_at")):
+        if value:
+            try:
+                stamps.append(dt.datetime.fromisoformat(value).timestamp())
+            except ValueError:
+                pass
+    try:
+        stamps.append(artifact_path(task, a["report"]).stat().st_mtime)
+    except (OSError, Invalid):
+        pass
+    return (time.time() - max(stamps)) / 60 if stamps else None
+
+def sweep_state(task, state, stale_minutes):
+    found = []
+    for aid, a in state["attempts"].items():
+        if a.get("status") != "running" or a["terminal"] is not None:
+            continue
+        age = signal_age(task, a)
+        if age is not None and age > stale_minutes:
+            interrupt(a, "sem sinal há %d min" % age)
+            found.append(aid)
+    return found
+
+def attempt_sweep(task, stale_minutes=None):
+    """running sem sinal recente vira interrompida. Não redispara nada."""
+    task = validate_task(task)
+    stale_minutes = tuned(task, "stale_minutes") if stale_minutes is None else stale_minutes
+    with lock(task / ".estado.lock"):
+        state = readstate(task)
+        found = sweep_state(task, state, stale_minutes)
+        if found:
+            save(task, state)
+        print("INTERROMPIDAS " + (", ".join(found) if found else "nenhuma"))
+        for aid in found:
+            print("  " + aid + ": tokens já gastos desconhecidos; informe com attempt-interrupt --tokens se a ferramenta mostrar")
+
+def attempt_watch(task, interval=60, duration=3600, stale_minutes=None):
+    """Vigia limitado à tarefa: varre a cada intervalo e para quando não há running ou ao fim da duração.
+    Não é daemon: quem o inicia (em segundo plano, pela ferramenta do harness) é a execução da leva."""
+    task = validate_task(task)
+    stale_minutes = tuned(task, "stale_minutes") if stale_minutes is None else stale_minutes
+    end = time.time() + duration
+    print("VIGIA %s · a cada %ds · até %ds" % (task.name, interval, duration), flush=True)
+    while True:
+        with lock(task / ".estado.lock"):
+            state = readstate(task)
+            found = sweep_state(task, state, stale_minutes)
+            if found:
+                save(task, state)
+            running = [aid for aid, a in state["attempts"].items() if a.get("status") == "running" and a["terminal"] is None]
+        for aid in found:
+            print("INTERROMPIDA " + aid + " · sem sinal: decida aproveitar relatório válido ou --retoma " + aid, flush=True)
+        if not running:
+            print("VIGIA fim · nenhuma tentativa running", flush=True)
+            return 0
+        if time.time() >= end:
+            print("VIGIA fim · duração esgotada com running: " + ", ".join(running) + " (sem vigia; rode attempt-sweep na retomada)", flush=True)
+            return 0
+        time.sleep(min(interval, max(1, end - time.time())))
+
+def attempt_complete(task, attempt_id, status, names, evidence, real_model=None, tokens=None):
     task = validate_task(task)
     if status not in {"concluido", "parcial", "bloqueado", "failed", "cancelled"}:
         raise Invalid("status terminal inválido")
@@ -577,7 +754,15 @@ def attempt_complete(task, attempt_id, status, names, evidence):
         arts = {name: artifact(task, name) for name in names}
         if status == "concluido" and signature(fingerprint(artifact_path(task, a["report"]))) == a.get("report_before"):
             raise Invalid("relatório preexistente não comprova esta tentativa; produza um relatório desta execução")
+        after_interruption = a.get("status") == "interrompida"
+        if after_interruption and status == "concluido":
+            # Relatório completo de agente cortado depois de gravar o marcador final vale; o fato fica registrado.
+            a["completed_after_interruption"] = True
         a["status"] = status
+        if real_model:
+            a["model_real"] = real_model
+        if tokens is not None:
+            a["tokens_spent"] = tokens
         a["terminal"] = {"task_id": state["task_id"], "attempt_id": attempt_id, "status": status,
                          "artifacts": arts, "evidence": evidence, "completed_at": now()}
         save(task, state)
@@ -598,6 +783,30 @@ def validate_report(task, state, attempt):
     if re.search(r"(?im)^STATUS:\s*(parcial|bloqueado|failed|cancelled)\s*$", text):
         raise Invalid("relatório declara status parcial ou bloqueado")
 
+def usage(task, which, values, model=None, source=""):
+    task = validate_task(task)
+    if which not in {"antes", "depois"}:
+        raise Invalid("uso: usage antes|depois")
+    if not source.strip():
+        raise Invalid("medição exige --fonte (ex.: /usage da sessão, medir.sh)")
+    clean = {k: v for k, v in values.items() if v is not None}
+    if not clean:
+        raise Invalid("informe ao menos um número (--entrada, --saida, --cache-leitura, --cache-escrita)")
+    with lock(task / ".estado.lock"):
+        state = readstate(task, create=True)
+        snaps = state.setdefault("usage", {})
+        snaps[which] = {"at": now(), "source": source.strip(), "model": model, **clean}
+        if which == "depois" and "antes" in snaps:
+            snaps["delta"] = {k: clean[k] - snaps["antes"][k] for k in clean if k in snaps["antes"]}
+            before = {k for k in snaps["antes"] if k in {"input", "output", "cache_read", "cache_write"}}
+            snaps["delta"]["partial"] = sorted(before ^ set(clean))  # campo medido só de um lado
+        save(task, state)
+        print("USO " + which + " " + json.dumps(snaps[which], ensure_ascii=False))
+        if "delta" in snaps and which == "depois":
+            d = {k: v for k, v in snaps["delta"].items() if k != "partial"}
+            print("FECHAMENTO " + " · ".join("%s %s" % (k, v) for k, v in sorted(d.items())) +
+                  " · compare com a tarefa anterior pela mesma fonte")
+
 def attempt_valid(task, state, attempt_id):
     a = state["attempts"].get(attempt_id)
     if not a or not a.get("terminal"):
@@ -616,7 +825,8 @@ def attempt_valid(task, state, attempt_id):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["init", "base", "release", "diff", "mark", "check", "pending",
-                                           "attempt-start", "attempt-complete", "attempt-check"])
+                                           "attempt-start", "attempt-complete", "attempt-check",
+                                           "attempt-ping", "attempt-interrupt", "attempt-sweep", "attempt-watch", "usage"])
     parser.add_argument("task")
     parser.add_argument("args", nargs="*")
     parser.add_argument("--exclusive", action="store_true")
@@ -625,6 +835,24 @@ def main(argv=None):
     parser.add_argument("--attempt")
     parser.add_argument("--allow-root", action="append", default=[])
     parser.add_argument("--evidence", default="")
+    parser.add_argument("--retroativa", action="store_true")
+    parser.add_argument("--modelo")
+    parser.add_argument("--categoria")
+    parser.add_argument("--contexto-tokens", type=int)
+    parser.add_argument("--acima-do-limite", default="")
+    parser.add_argument("--retoma")
+    parser.add_argument("--max-paralelo", type=int, default=MAX_PARALLEL)
+    parser.add_argument("--modelo-real")
+    parser.add_argument("--tokens", type=int)
+    parser.add_argument("--motivo", default="")
+    parser.add_argument("--stale-minutos", type=float, default=None)
+    parser.add_argument("--fonte", default="")
+    parser.add_argument("--intervalo", type=int, default=60)
+    parser.add_argument("--duracao", type=int, default=3600)
+    parser.add_argument("--entrada", type=int)
+    parser.add_argument("--saida", type=int)
+    parser.add_argument("--cache-leitura", type=int)
+    parser.add_argument("--cache-escrita", type=int)
     ns = parser.parse_intermixed_args(argv)
     try:
         cmd, task, args = ns.command, Path(ns.task), ns.args
@@ -632,11 +860,21 @@ def main(argv=None):
         elif cmd == "base" and args: base(task, args, ns.exclusive)
         elif cmd == "release" and not args: release(task)
         elif cmd == "diff" and args: diff(task, args)
-        elif cmd == "mark" and len(args) >= 2: mark(task, args[0], args[1], args[2:], ns.depends, ns.attempt, ns.evidence, ns.allow_root)
+        elif cmd == "mark" and len(args) >= 2: mark(task, args[0], args[1], args[2:], ns.depends, ns.attempt, ns.evidence, ns.allow_root, ns.retroativa)
         elif cmd == "check" and not args: return check(task)
         elif cmd == "pending" and not args: pending(task)
-        elif cmd == "attempt-start" and len(args) == 4: attempt_start(task, *args)
-        elif cmd == "attempt-complete" and len(args) == 2: attempt_complete(task, *args, ns.artifact, ns.evidence)
+        elif cmd == "attempt-start" and len(args) == 4:
+            attempt_start(task, *args, model=ns.modelo, category=ns.categoria, context_tokens=ns.contexto_tokens,
+                          above_limit=ns.acima_do_limite, resume=ns.retoma, max_parallel=ns.max_paralelo)
+        elif cmd == "attempt-complete" and len(args) == 2:
+            attempt_complete(task, *args, ns.artifact, ns.evidence, ns.modelo_real, ns.tokens)
+        elif cmd == "attempt-ping" and len(args) == 1: attempt_ping(task, args[0])
+        elif cmd == "attempt-interrupt" and len(args) == 1: attempt_interrupt(task, args[0], ns.motivo, ns.tokens)
+        elif cmd == "attempt-sweep" and not args: attempt_sweep(task, ns.stale_minutos)
+        elif cmd == "attempt-watch" and not args: return attempt_watch(task, ns.intervalo, ns.duracao, ns.stale_minutos)
+        elif cmd == "usage" and len(args) == 1:
+            usage(task, args[0], {"input": ns.entrada, "output": ns.saida, "cache_read": ns.cache_leitura,
+                                  "cache_write": ns.cache_escrita}, ns.modelo, ns.fonte)
         elif cmd == "attempt-check" and len(args) == 1:
             task = validate_task(task)
             with lock(task / ".estado.lock"):

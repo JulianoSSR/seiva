@@ -8,7 +8,7 @@ description: |
 license: MIT
 compatibility: Núcleo independente do aplicativo. Scripts exigem git, bash e dependências verificadas; estado e monitor usam Python 3. Capacidades de agentes, modelos e medição são detectadas por ambiente.
 metadata:
-  version: "1.6.0"
+  version: "1.7.0"
   author: "JulianoSSR"
 ---
 
@@ -29,7 +29,7 @@ metadata:
 9. **Teto interrompe, não aprova.** N1 até 1 rodada, N2 até 2, N3 até 3 por portão. Grave confirmado fecha com correção verificada ou aceite explícito permitido pelas regras. No teto, pendência continua pendência.
 10. **Premissa se mede.** Sem comando ou evidência, marque suposição e seu impacto.
 11. **Limitação aparece.** Dado ausente não é zero; autoconferência não é revisão independente; notificação não é contabilidade.
-12. **Evolução precisa de evidência.** Escape e correção do usuário viram proposta, sem mudar regras automaticamente.
+12. **Evolução precisa de evidência.** Escape e correção do usuário viram proposta para o repositório, sempre com consentimento. A instalação local só se ajusta sozinha dentro de uma lista fechada, reversível e declarada no fechamento ([ajustes locais](referencias/ajustes-locais.md)); regras do núcleo nunca mudam automaticamente.
 
 ## Fluxo
 
@@ -54,7 +54,7 @@ Execução fica em pasta privada ignorada pelo git: `.claude/seiva/` se já igno
 
 Detecte capacidades de agentes, contexto limpo, modelos, ferramentas, isolamento e medição. Carregue apenas o adaptador necessário: [harness](referencias/harness.md). Não crie agentes globais para compensar recurso ausente.
 
-Em retomada, siga [retomada](referencias/retomada.md): localizar tarefa, ler contexto e conferir estado antes de qualquer redisparo.
+Em retomada, siga [retomada](referencias/retomada.md): localizar tarefa, ler contexto e conferir estado antes de qualquer redisparo; o `conferir` já varre e marca como interrompida a tentativa sem sinal.
 
 ### 1 · Triagem
 
@@ -104,7 +104,7 @@ Recalcule lentes pelo diff. N1 tem revisor; N2, adversário e lente de sinal nov
 
 Atualize os registros canônicos e respeite o protocolo de entrega, commit e publicação do projeto. Informe mudança, prova, pendências, limitações, decisões e independência. Achado grave aceito precisa de responsável, escopo, motivo e autorização válida; inegociável não admite aceite.
 
-Meça pela fonte disponível com intervalo da tarefa, incluindo tentativas. Com `medir.sh`, confirme suporte e atribuição antes de usar números; ele separa os papéis pela descrição de cada agente, que começa pelo papel (`Construtor: ...`). Registre aprendizado local em `julianossr.md`, sem expor dados privados. Conteúdo público deriva apenas de avaliação sanitizada.
+Meça pela fonte disponível com intervalo da tarefa, incluindo tentativas: grave o `/usage` antes e depois (`estado_tarefa.py usage antes|depois --fonte`), com entrada, saída e leitura de cache separadas e o modelo, e leve a linha de fechamento ao registro para comparar com a tarefa seguinte. Com `medir.sh`, confirme suporte e atribuição antes de usar números; ele separa os papéis pela descrição de cada agente, que começa pelo papel (`Construtor: ...`). Registre a tarefa em `ajustes.py tarefa` e leve a linha de `ajustes.py mostrar` à resposta. Registre aprendizado local em `julianossr.md`, sem expor dados privados. Conteúdo público deriva apenas de avaliação sanitizada.
 
 ## Comunicação e aprendizado local
 
@@ -114,13 +114,13 @@ No fechamento, bloqueio ou intervenção, as [seis capacidades](referencias/auto
 
 ## Estado e parada
 
-`estado.json` é a fonte canônica de execução; Markdown é projeção e contexto curto. Tentativa, dono, base, hashes e evidência sustentam a conclusão. Marcar etapa feita exige artefatos e --attempt válido; etapa mecânica usa --evidence explícita. Estado legado sem comprovação exige revalidação. Migração de tarefa legada preserva arquivos e não converte relatório antigo em aprovação atual. Veja [retomada](referencias/retomada.md).
+`estado.json` é a fonte canônica de execução; Markdown é projeção e contexto curto. Tentativa, dono, base, hashes e evidência sustentam a conclusão. Marcar etapa feita exige artefatos e --attempt válido; etapa mecânica usa --evidence explícita. Estado legado sem comprovação exige revalidação. Migração de tarefa legada preserva arquivos e não converte relatório antigo em aprovação atual; etapa feita fora do estado entra com `marcar N feita <artefatos> --retroativa --evidence 'onde foi feita'`, e o `conferir` a mostra como retroativa. Veja [retomada](referencias/retomada.md).
 
-Antes da leva, grave pacote, tentativa e próxima ação. Depois, valide relatório e artefatos contra a tentativa esperada, incluindo marcador final produzido pelo agente com os IDs corretos; o orquestrador não completa relatório velho para aceitá-lo. No limite de custo, contexto, rodadas ou capacidade, pare de abrir levas, guarde pendências e deixe caminho de retomada. Não reduza nível para continuar.
+Antes da leva, grave pacote, tentativa e próxima ação, com categoria e modelo do papel e o tamanho do contexto (`attempt-start --categoria --modelo --contexto-tokens`). Pacote mais contexto herdado acima de 150 mil tokens pede dividir a tarefa ou gravar o contexto curto e abrir outra sessão; o disparo só segue acima disso com motivo registrado. Ao abrir a leva, suba o vigia da tarefa em segundo plano (`attempt-watch`, pela ferramenta de execução do harness; para sozinho quando nada roda ou ao fim da duração, não é daemon). Subagente leva pacote enxuto, sem herdar a conversa, e no máximo 3 rodam ao mesmo tempo. Depois, valide relatório e artefatos contra a tentativa esperada, incluindo marcador final produzido pelo agente com os IDs corretos; o orquestrador não completa relatório velho para aceitá-lo. **Tentativa cortada não some.** O agente dá sinal de vida (`attempt-ping`); ao retomar, `conferir` e `attempt-sweep` trocam `running` sem sinal recente por `interrompida`, com os tokens já gastos anotados (ou "desconhecidos"), e nada é redisparado sem decisão (`--retoma`). Relatório completo de agente interrompido vale quando o marcador final, produzido pelo agente, confere com tarefa e tentativa; sem marcador, é redisparo. A conclusão registra que houve interrupção. No limite de custo, contexto, rodadas ou capacidade, pare de abrir levas, guarde pendências e deixe caminho de retomada. Não reduza nível para continuar.
 
 ## Referências sob demanda
 
 - [Terreno](referencias/terreno.md), [triagem](referencias/triagem.md), [modelos](referencias/modelos.md).
 - [Contratos](referencias/contratos.md), [revisão](referencias/revisao.md), [harness](referencias/harness.md).
-- [Retomada](referencias/retomada.md), [evolução](referencias/evolucao.md), [avaliações](docs/AVALIACOES.md).
+- [Ajustes locais](referencias/ajustes-locais.md), [retomada](referencias/retomada.md), [evolução](referencias/evolucao.md), [avaliações](docs/AVALIACOES.md).
 - `papeis/` e `moldes/`: só o papel e o molde necessários à etapa.

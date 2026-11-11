@@ -25,6 +25,10 @@ Quem implementa não aprova. Ordem de diversidade: `outro-provedor`, `outro-mode
 
 N2 admite outra instância no mesmo modelo, de contexto limpo. N3 requer a diversidade prevista no perfil e na triagem. Se o ambiente não consegue fornecê-la, declare a lacuna antes de prosseguir; não a esconda atrás de um nome de papel.
 
+## Categoria por papel e modelo real
+
+A triagem fixa a categoria de **cada papel** (batedor, construtor, adversário, lentes, implementador, verificador, revisor, conserto) e o pacote a registra. O disparo passa o `model` explícito; agente que herda o modelo da sessão não cumpre a categoria. Se o adaptador não deixa escolher o modelo, a tarefa registra a lacuna (`attempt-start` sem `--modelo` avisa) e **não declara independência**. Cada relatório e cada tentativa guardam o modelo real usado (`attempt-complete --modelo-real`), porque o pedido e a execução podem divergir. Revisão e conserto em categoria menor que a exigida valem como autoconferência, não como portão.
+
 ## Repetição e indisponibilidade
 
 - Rodada 2: nova instância, mesma categoria, pacote com o erro e a evidência anterior.

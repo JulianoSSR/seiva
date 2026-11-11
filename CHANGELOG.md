@@ -1,5 +1,20 @@
 # Registro de mudanças
 
+## 1.7.0 (2026-11-11)
+
+Ajustes vindos da tarefa `2026-11-09-e1-raiz` (Raiz Mestra), em que o limite de 5 horas cortou cinco implementadores e a retomada não percebeu:
+
+- **Interrupção detectada.** A tentativa guarda `last_seen_at`; `attempt-ping` renova, `attempt-sweep` troca `running` sem sinal (15 min) por `interrompida` com os tokens já gastos (desconhecidos quando não há fonte), `attempt-interrupt` faz o mesmo à mão. Redisparar o mesmo trabalho exige `--retoma <id>`. `conferir` lista as interrompidas e falha com `running` sem sinal. Etapa também aceita `interrompida: motivo`.
+- **Varredura automática e vigia.** `conferir` varre sozinho; `attempt-watch` é um vigia limitado (intervalo e duração), iniciado pela leva em segundo plano, que termina quando nada roda. Gravação do relatório também conta como sinal de vida.
+- **Relatório de agente que morreu.** Vale quando o marcador final, escrito pelo agente, confere com tarefa e tentativa; a conclusão grava `completed_after_interruption`. Sem marcador, redisparo ou `parcial`.
+- **Modelo por papel.** `attempt-start --categoria --modelo` registra o pedido e `attempt-complete --modelo-real` o que rodou; sem modelo explícito o disparo avisa e a tarefa não declara independência. A triagem fixa uma categoria por papel, incluindo revisor e conserto.
+- **Contexto.** `--contexto-tokens` e a estimativa do pacote somam; acima de 150 mil o disparo é recusado, salvo `--acima-do-limite` com motivo. No máximo 3 tentativas `running` juntas.
+- **Medição.** `usage antes|depois` grava entrada, saída, cache e modelo com a fonte, e imprime a linha `FECHAMENTO` com a diferença só dos campos medidos nos dois lados.
+- **Ajustes locais automáticos (canal A).** `scripts/ajustes.py` e `ajustes.json` privado: lista fechada (`stale_minutes`, `context_limit` que só aperta, nota por lente), evidência de duas tarefas, um ajuste em teste por vez, reversão automática se quedas, rodadas ou tokens piorarem, e linha de transparência no fechamento. Não toca arquivo da skill nem o canal do GitHub, que segue com ficha exata e consentimento.
+- **Migração de tarefa criada sem etapas marcadas.** `marcar --retroativa --evidence` e aviso no `conferir`.
+
+Limites: o tamanho do pacote é estimado por bytes (≈ 3,5 bytes por token), o contexto herdado é declarado pelo orquestrador e não medido, e o sinal de vida vem do `attempt-ping` ou da gravação do relatório, então agente que trabalha muito tempo sem gravar nem pingar parece parado; o vigia não é daemon, morre com a sessão e quem o sobe é a leva, não um hook; nada disso é contagem oficial.
+
 ## 1.6.0 (2026-11-09)
 
 Correções da revisão independente do Claude Code sobre o `9d773be`:
